@@ -98,9 +98,6 @@ function saveGameState() {
   }
 }
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-
 // Fallback to index.html for root path (Redirects mobile devices to mobile.html automatically)
 app.get('/', (req, res) => {
   const userAgent = req.headers['user-agent'] || '';
@@ -112,6 +109,9 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
 });
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Socket.io Real-Time Logic
 io.on('connection', (socket) => {
