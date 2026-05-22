@@ -27,24 +27,40 @@ class SoundSynth {
     this.init();
     const ctx = this.ctx;
     
-    // Quick down-sweeping triangle wave for the balloon deflate rubber sound
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    // 1. Bass thump/boom (the low-frequency air release)
+    const boomOsc = ctx.createOscillator();
+    const boomGain = ctx.createGain();
+    boomOsc.connect(boomGain);
+    boomGain.connect(ctx.destination);
     
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(350, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(15, ctx.currentTime + 0.12);
+    boomOsc.type = 'sine';
+    boomOsc.frequency.setValueAtTime(160, ctx.currentTime);
+    boomOsc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.15);
     
-    gain.gain.setValueAtTime(0.6, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+    boomGain.gain.setValueAtTime(1.2, ctx.currentTime);
+    boomGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
     
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
+    boomOsc.start();
+    boomOsc.stop(ctx.currentTime + 0.15);
     
-    // Pop snap noise
-    const bufferSize = ctx.sampleRate * 0.04;
+    // 2. High-frequency snap (the latex tearing)
+    const snapOsc = ctx.createOscillator();
+    const snapGain = ctx.createGain();
+    snapOsc.connect(snapGain);
+    snapGain.connect(ctx.destination);
+    
+    snapOsc.type = 'triangle';
+    snapOsc.frequency.setValueAtTime(450, ctx.currentTime);
+    snapOsc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.08);
+    
+    snapGain.gain.setValueAtTime(0.8, ctx.currentTime);
+    snapGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+    
+    snapOsc.start();
+    snapOsc.stop(ctx.currentTime + 0.08);
+    
+    // 3. Sharp white noise pop snap (the explosive sound)
+    const bufferSize = ctx.sampleRate * 0.08;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
@@ -56,18 +72,19 @@ class SoundSynth {
     
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = 1200;
+    filter.frequency.value = 1000;
+    filter.Q.value = 2;
     
     const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.4, ctx.currentTime);
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.04);
+    noiseGain.gain.setValueAtTime(1.5, ctx.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
     
     noise.connect(filter);
     filter.connect(noiseGain);
     noiseGain.connect(ctx.destination);
     
     noise.start();
-    noise.stop(ctx.currentTime + 0.04);
+    noise.stop(ctx.currentTime + 0.08);
   }
   
   playThrow() {
@@ -436,7 +453,7 @@ function executePop(index, prize) {
     modalPrizeEmoji.innerText = getPrizeEmoji(prize);
     modalPrizeText.innerText = prize;
     celebrationOverlay.classList.add('active');
-    sounds.playVictory();
+    // sounds.playVictory(); // Removed prize sound effect as requested
   }, 450);
 }
 
