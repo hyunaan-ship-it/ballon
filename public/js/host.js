@@ -458,8 +458,6 @@ socket.on('init-state', (data) => {
   // This supports localhost, local network IPs, and cellular-accessible public tunnels (like ngrok) automatically!
   const qrBox = document.getElementById('qrcode-box');
   qrBox.innerHTML = '';
-  const qrCanvas = document.createElement('canvas');
-  qrBox.appendChild(qrCanvas);
   
   const currentOrigin = window.location.origin;
   let mobileUrl = currentOrigin + '/mobile.html';
@@ -472,26 +470,27 @@ socket.on('init-state', (data) => {
     }
   }
   
-  QRCode.toCanvas(qrCanvas, mobileUrl, {
-    width: 150,
-    margin: 1,
-    color: {
-      dark: '#130d22',
-      light: '#ffffff'
+  try {
+    new QRCode(qrBox, {
+      text: mobileUrl,
+      width: 150,
+      height: 150,
+      colorDark: '#130d22',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    
+    document.getElementById('qr-address-desc').innerHTML = `모바일 다트 접속 URL:<br><a href="${mobileUrl}" target="_blank" style="color: var(--accent-cyan); font-weight: 700; text-decoration: none; word-break: break-all;">${mobileUrl}</a>`;
+    
+    // Update the simple typable address for manual connection
+    const simplifiedUrl = mobileUrl.replace('http://', '').replace('/mobile.html', '');
+    const manualUrlEl = document.getElementById('manual-url-text');
+    if (manualUrlEl) {
+      manualUrlEl.innerText = simplifiedUrl;
     }
-  }, (err) => {
-    if (err) console.error("QR Code Generation failed:", err);
-    else {
-      document.getElementById('qr-address-desc').innerHTML = `모바일 다트 접속 URL:<br><a href="${mobileUrl}" target="_blank" style="color: var(--accent-cyan); font-weight: 700; text-decoration: none; word-break: break-all;">${mobileUrl}</a>`;
-      
-      // Update the simple typable address for manual connection
-      const simplifiedUrl = mobileUrl.replace('http://', '').replace('/mobile.html', '');
-      const manualUrlEl = document.getElementById('manual-url-text');
-      if (manualUrlEl) {
-        manualUrlEl.innerText = simplifiedUrl;
-      }
-    }
-  });
+  } catch (err) {
+    console.error("QR Code Generation failed:", err);
+  }
 });
 
 socket.on('mobile-connected', (data) => {

@@ -105,7 +105,8 @@
   transition: var(--transition-normal);
 }
 
-.qr-box canvas {
+.qr-box canvas,
+.qr-box img {
   width: 150px !important;
   height: 150px !important;
 }
