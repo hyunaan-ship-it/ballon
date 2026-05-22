@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🎯 모바일 다트 컨트롤러</title>
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/mobile.css">
+  <!-- Socket.io Client -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- iOS / Safari Motion Sensor Permission Dialog (Shown only if required) -->
+  <div id="permission-overlay" class="permission-overlay" style="display: none;">
+    <div class="permission-card glass-panel">
+      <div class="permission-icon">🎯</div>
+      <h3 class="permission-title">모션 센서 활성화</h3>
+      <p class="permission-desc">
+        스마트폰의 움직임 감지(가속도계)를 활성화하면<br>
+        실제 다트를 던지는 모션으로 게임을 즐길 수 있습니다.
+      </p>
+      <button id="request-perm-btn" class="btn-primary" style="width: 100%; justify-content: center;">
+        센서 연결 및 승인
+      </button>
+      <button id="skip-perm-btn" class="btn-secondary" style="width: 100%; justify-content: center;">
+        건너뛰기 (밀어서 던지기)
+      </button>
+    </div>
+  </div>
+
+  <div class="mobile-container">
+    <!-- Top Header -->
+    <header class="mobile-header">
+      <div style="display: flex; flex-direction: column;">
+        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Dart Controller</span>
+        <span style="font-size: 1.1rem; font-weight: 800; color: white;">다트 던지기</span>
+      </div>
+      <div id="connection-badge" class="connection-badge disconnected">
+        <span class="dot" style="background-color: currentColor;"></span>
+        <span id="badge-text">연결 대기중</span>
+      </div>
+    </header>
+
+    <!-- Center Swipe & Dart Throwing Arena -->
+    <div class="dart-arena" id="throw-arena">
+      <!-- Swiping Visual Guide -->
+      <div class="swipe-arrows">
+        <div class="arrow-icon"></div>
+        <div class="arrow-icon" style="animation-delay: 0.3s;"></div>
+        <div class="arrow-icon" style="animation-delay: 0.6s;"></div>
+      </div>
+
+      <div class="swipe-guide-text">
+        핸드폰을 앞으로 <strong>휙! 휘두르거나</strong><br>
+        아래 다트를 <strong>위로 힘껏 밀어서</strong> 던지세요!
+      </div>
+
+      <!-- Gorgeous 3D Vector Dart Pin -->
+      <div class="dart-holder" id="dart-pin">
+        <svg class="dart-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Orange accent cone -->
+          <path d="M60 40 L85 15 L90 20 L65 45 Z" fill="#ff9f43" />
+          <!-- Neon orange tip -->
+          <path d="M85 15 L95 5 L90 20 Z" fill="#ff5252" />
+          <!-- Heavy Steel barrel -->
+          <rect x="40" y="40" width="36" height="16" rx="4" transform="rotate(-45 40 40)" fill="url(#metalGrad)" stroke="rgba(255,255,255,0.2)" stroke-width="1" />
+          <!-- Ribbed grip ridges -->
+          <line x1="50" y1="46" x2="61" y2="57" stroke="rgba(0,0,0,0.4)" stroke-width="2" />
+          <line x1="45" y1="51" x2="56" y2="62" stroke="rgba(0,0,0,0.4)" stroke-width="2" />
+          <line x1="40" y1="56" x2="51" y2="67" stroke="rgba(0,0,0,0.4)" stroke-width="2" />
+          <!-- Red feather flights -->
+          <path d="M15 85 L2 98 L18 72 L32 72 Z" fill="#ee5253" />
+          <path d="M15 85 L2 98 L40 98 L32 72 Z" fill="#ff7675" fill-opacity="0.8" />
+          <!-- Aluminium shaft stem -->
+          <rect x="23" y="61" width="24" height="6" transform="rotate(-45 23 61)" fill="#c8d6e5" />
+          
+          <defs>
+            <linearGradient id="metalGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#8395a7" />
+              <stop offset="45%" stop-color="#c8d6e5" />
+              <stop offset="55%" stop-color="#ffffff" />
+              <stop offset="100%" stop-color="#576574" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Live Motion Intensity Bar -->
+    <div class="power-section glass-panel" style="padding: 12px 18px; border-radius: 16px;">
+      <div class="power-label">
+        <span>던지기 강도 (Power)</span>
+        <span id="power-val">0%</span>
+      </div>
+      <div class="power-bar-bg">
+        <div class="power-bar-fill" id="power-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success / Result Indicator Overlay -->
+  <div class="feedback-overlay glass-panel" id="result-overlay">
+    <div class="feedback-title">🎯 다트 명중!</div>
+    <div style="font-size: 0.95rem; color: var(--text-secondary); margin-top: 8px;">획득한 경품은 바로...</div>
+    <div class="feedback-prize" id="result-prize">스타벅스 커피 쿠폰</div>
+    <button class="btn-primary" id="result-confirm-btn" style="margin-top: 20px; width: 100%; justify-content: center; padding: 10px 20px;">
+      다시 준비하기
+    </button>
+  </div>
+
+  <script src="js/mobile.js"></script>
+</body>
+</html>

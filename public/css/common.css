@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+:root {
+  /* Color Palette - Premium Neon & Glassmorphism */
+  --bg-primary: #0a0712;
+  --bg-secondary: #130d22;
+  --bg-gradient: linear-gradient(135deg, #0b0816 0%, #150f2b 50%, #20133c 100%);
+  --accent-cyan: #00f2fe;
+  --accent-purple: #9d4edd;
+  --accent-pink: #ff007f;
+  --text-primary: #ffffff;
+  --text-secondary: #a9a2c3;
+  --text-muted: #6b6387;
+  
+  /* Glassmorphism Styles */
+  --glass-bg: rgba(20, 15, 38, 0.6);
+  --glass-bg-hover: rgba(25, 20, 48, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-focus: rgba(0, 242, 254, 0.4);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --glow-cyan: 0 0 15px rgba(0, 242, 254, 0.5);
+  --glow-purple: 0 0 15px rgba(157, 78, 221, 0.5);
+  
+  /* Balloon Colors (3D Radial Gradients) */
+  --balloon-red: radial-gradient(circle at 35% 35%, #ff4b72 10%, #d90429 60%, #80001c 100%);
+  --balloon-blue: radial-gradient(circle at 35% 35%, #54a0ff 10%, #2e86de 60%, #0a3d62 100%);
+  --balloon-green: radial-gradient(circle at 35% 35%, #2ed573 10%, #20bf6b 60%, #076d33 100%);
+  --balloon-yellow: radial-gradient(circle at 35% 35%, #ffeaa7 10%, #f1c40f 60%, #b78a02 100%);
+  --balloon-purple: radial-gradient(circle at 35% 35%, #d6a2e8 10%, #8c7ae6 60%, #482ff7 100%);
+  --balloon-orange: radial-gradient(circle at 35% 35%, #ffbe76 10%, #e67e22 60%, #a04000 100%);
+  --balloon-pink: radial-gradient(circle at 35% 35%, #ff9ff3 10%, #f368e0 60%, #9b1e7c 100%);
+  
+  /* Transitions */
+  --transition-fast: 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-normal: 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-slow: 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+  background: var(--bg-primary);
+  background-image: var(--bg-gradient);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Glass Card Base */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: var(--glass-shadow);
+  transition: var(--transition-normal);
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-purple);
+}
+
+/* Interactive Elements */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  transition: var(--transition-fast);
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 242, 254, 0.4), var(--glow-cyan);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 12px 24px;
+  border-radius: 12px;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(1.5deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.8; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}

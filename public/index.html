@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎈 Real-Time Motion Balloon Popping Game</title>
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/host.css">
+  <!-- Local Offline-Safe QRCode Client Library -->
+  <script src="js/qrcode.min.js"></script>
+  <!-- Socket.io Client -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <div class="host-container">
+    <!-- Sidebar Controls & QR -->
+    <aside class="sidebar glass-panel">
+      <div class="brand-section">
+        <h1>풍선 터트리기 🎈</h1>
+        <p>Motion-Controlled Dart Game</p>
+      </div>
+
+      <!-- Network & Mobile Connection Info -->
+      <div class="status-panel glass-panel">
+        <div class="status-item">
+          <span class="status-label">서버 상태</span>
+          <span class="status-value"><span class="dot dot-online"></span>ON</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">연결된 모바일</span>
+          <span class="status-value" id="mobile-count-val">0대 연결됨</span>
+        </div>
+      </div>
+
+      <!-- Connection QR Code -->
+      <div class="qr-panel glass-panel">
+        <span class="qr-title">📱 모바일 다트 연결</span>
+        <div class="qr-box" id="qrcode-box">
+          <!-- QR Code Canvas will be generated here -->
+        </div>
+        <p class="qr-desc" id="qr-address-desc">동일한 Wi-Fi 환경에서<br>위 QR 코드를 스캔하세요!</p>
+        
+        <div class="manual-entry-box" style="margin-top: 15px; padding: 12px; background: rgba(0, 242, 254, 0.04); border: 1px dashed rgba(0, 242, 254, 0.25); border-radius: 12px; text-align: center;">
+          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 5px; letter-spacing: 0.5px; text-transform: uppercase;">🔒 카메라 보안 차단 시 수동 접속</span>
+          <span style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 6px; line-height: 1.4;">인터넷 주소창에 아래 숫자를 입력해 접속하세요!</span>
+          <span id="manual-url-text" style="font-size: 1.15rem; font-weight: 800; color: var(--accent-cyan); text-shadow: 0 0 10px rgba(0, 242, 254, 0.35); letter-spacing: 0.5px; word-break: break-all; user-select: all;">10.164.173.35:3000</span>
+        </div>
+      </div>
+
+      <!-- Control buttons -->
+      <div class="control-panel">
+        <button id="sound-btn" class="btn-secondary" style="width: 100%; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          🔊 사운드: 켜짐
+        </button>
+        <button id="edit-prizes-btn" class="btn-secondary" style="width: 100%; margin-bottom: 8px; justify-content: center; background: rgba(0, 242, 254, 0.05); border-color: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; font-weight: 600;">
+          ⚙️ 실시간 경품 편집
+        </button>
+        <button id="reset-btn" class="btn-primary" style="width: 100%; justify-content: center; margin-bottom: 8px;">
+          🔄 보드 초기화
+        </button>
+        <a href="/admin.html" target="_blank" class="btn-secondary" style="width: 100%; text-align: center; text-decoration: none; font-size: 0.85rem; padding: 10px;">
+          🛠️ 운영자 고급 설정 대시보드
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Game Board -->
+    <main class="board-container">
+      <header class="board-header">
+        <div>
+          <h2 style="font-size: 1.6rem; font-weight: 700; margin-bottom: 2px;">다트 풍선판</h2>
+          <span class="board-title-desc">스마트폰을 휘둘러 다트를 던지거나 풍선을 클릭해 터트리세요!</span>
+        </div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-cyan);" id="popped-ratio">
+          남은 풍선: 25 / 25
+        </div>
+      </header>
+
+      <!-- 5x5 Balloon Grid -->
+      <div class="board-grid" id="balloon-grid">
+        <!-- 25 grid cells will be dynamically injected here -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Fullscreen Celebration Modal -->
+  <div class="modal-overlay" id="celebration-overlay">
+    <div class="prize-modal glass-panel">
+      <div class="modal-congrats">🎉 CONGRATULATIONS 🎉</div>
+      <h2 class="modal-title">경품 당첨!</h2>
+      <div class="modal-prize-circle" id="modal-prize-emoji">🎁</div>
+      <div class="modal-prize-name" id="modal-prize-text">스타벅스 커피 쿠폰</div>
+      <button class="btn-primary" id="modal-close-btn" style="padding: 12px 36px; font-size: 1.1rem;">
+        확인
+      </button>
+    </div>
+  </div>
+
+  <!-- Fullscreen Integrated Prize Editor Modal -->
+  <div class="modal-overlay" id="edit-prizes-overlay">
+    <div class="glass-panel" style="width: 800px; max-width: 95%; padding: 30px; text-align: left; display: flex; flex-direction: column; gap: 20px; max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
+        <h2 style="font-size: 1.5rem; font-weight: 800; background: linear-gradient(45deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">⚙️ 실시간 경품 편집기</h2>
+        <button class="btn-secondary" id="edit-close-btn" style="padding: 6px 12px; font-size: 0.85rem;">닫기</button>
+      </div>
+      
+      <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+        각 풍선 번호 뒤에 배치할 경품 이름을 입력해 주세요. 저장 시 서버 및 모바일 기기에 <strong>실시간 live 동기화</strong>됩니다.
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 5px;" id="modal-inputs-grid">
+        <!-- 25 inputs will be dynamically generated in host.js -->
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 15px; justify-content: flex-end;">
+        <button class="btn-secondary" id="edit-preset-btn" style="font-size: 0.9rem; padding: 10px 20px;">🎁 추천 프리셋 채우기</button>
+        <button class="btn-primary" id="edit-save-btn" style="font-size: 0.9rem; padding: 10px 25px;">💾 저장 및 동기화</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/host.js"></script>
+</body>
+</html>

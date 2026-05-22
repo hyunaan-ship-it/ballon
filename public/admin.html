@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚙️ 운영자 경품 편집기 - 풍선터트리기</title>
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <!-- Socket.io Client -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <div class="admin-container">
+    <!-- Header Area -->
+    <header class="admin-header">
+      <div>
+        <h1>⚙️ 게임 운영 설정</h1>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 5px;">풍선 뒤에 숨겨진 25개의 경품을 설정하고 게임판을 관리합니다.</p>
+      </div>
+      <div>
+        <a href="/" class="btn-secondary" style="text-decoration: none; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px;">
+          🖥️ 메인 풍선판 보기
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-layout">
+      
+      <!-- Left: 5x5 Prize Cards Inputs -->
+      <section class="prize-edit-panel glass-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="font-size: 1.3rem; font-weight: 700;">🎈 5 x 5 풍선별 경품 편집</h2>
+          <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">각 번호 칸에 들어갈 경품을 입력하세요.</span>
+        </div>
+
+        <form id="prize-form">
+          <div class="prize-grid" id="admin-prize-grid">
+            <!-- 25 input cells will be dynamically injected here -->
+          </div>
+        </form>
+      </section>
+
+      <!-- Right: Control Center Sidebar -->
+      <aside class="toolkit-sidebar">
+        
+        <!-- Action Trigger Card -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">게임 동기화</h3>
+          <button id="save-prizes-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 1rem;">
+            💾 경품 내용 저장 & 동기화
+          </button>
+          <div class="alert-box">
+            경품 저장 시 메인 풍선판 및 연결된 모바일에 <strong>실시간으로 동기화</strong>되며, 서버 파일에 영구 저장됩니다.
+          </div>
+        </div>
+
+        <!-- Quick Template Preset Card -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">경품 프리셋 템플릿</h3>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-top: -5px;">
+            자주 사용하는 경품 세트로 25개 칸을 한 번에 채울 수 있습니다. (저장 버튼을 눌러야 최종 적용됩니다)
+          </p>
+          <div class="preset-list">
+            <button class="preset-btn" id="preset-balanced">🎁 균형잡힌 이벤트 프리셋</button>
+            <button class="preset-btn" id="preset-generous">🔥 꽝 없는 푸짐한 프리셋</button>
+            <button class="preset-btn" id="preset-blank">💨 모두 꽝으로 비우기</button>
+          </div>
+        </div>
+
+        <!-- Board State Operations -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">풍선판 초기화</h3>
+          
+          <button id="op-reset" class="btn-secondary" style="width: 100%; margin-bottom: 8px; justify-content: center; font-size: 0.85rem;">
+            🔄 풍선 리셋 (경품 위치 유지)
+          </button>
+          
+          <button id="op-shuffle" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem; background: rgba(157, 78, 221, 0.05); border-color: rgba(157, 78, 221, 0.2); color: #c8a2c9;">
+            🔀 풍선 리셋 + 경품 셔플 (랜덤 섞기)
+          </button>
+          
+          <div class="alert-box" style="background: rgba(255, 23, 68, 0.02); border-color: rgba(255, 23, 68, 0.1); margin-top: 5px; font-size: 0.8rem;">
+            ⚠️ <strong>풍선 리셋</strong>을 진행하면 터졌던 풍선들이 전부 재생성되며, <strong>경품 셔플</strong>을 진행할 경우 경품들의 위치가 무작위로 뒤바뀝니다!
+          </div>
+        </div>
+
+      </aside>
+
+    </div>
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,406 @@
+.host-container {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: 100vh;
+  width: 100vw;
+  padding: 20px;
+  gap: 20px;
+  overflow: hidden;
+}
+
+/* Sidebar / Info Panel */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
+
+.brand-section {
+  padding: 20px;
+  text-align: center;
+}
+
+.brand-section h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: linear-gradient(45deg, #fff, var(--accent-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 5px;
+}
+
+.brand-section p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.status-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.status-label {
+  color: var(--text-secondary);
+}
+
+.status-value {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-online {
+  background-color: #00e676;
+  box-shadow: 0 0 10px #00e676;
+}
+
+.dot-offline {
+  background-color: var(--text-muted);
+}
+
+/* QR Code Section */
+.qr-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  flex-grow: 1;
+  justify-content: center;
+}
+
+.qr-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--accent-cyan);
+}
+
+.qr-box {
+  background: white;
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: var(--glass-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-normal);
+}
+
+.qr-box canvas {
+  width: 150px !important;
+  height: 150px !important;
+}
+
+.qr-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.control-panel {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Main Board Grid */
+.board-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding: 0 10px;
+}
+
+.board-title-desc {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 15px;
+  flex-grow: 1;
+  perspective: 1000px;
+}
+
+/* Grid Cell wrapper */
+.grid-cell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--transition-slow);
+}
+
+/* Prize Card (Revealed state background) */
+.prize-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.grid-cell.popped .prize-card {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.prize-icon {
+  font-size: 1.8rem;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.3));
+}
+
+.prize-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  word-break: keep-all;
+}
+
+.prize-index-tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+/* Balloon (Active Foreground) */
+.balloon-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  transition: transform var(--transition-fast), opacity var(--transition-fast);
+}
+
+.grid-cell.popped .balloon-wrapper {
+  opacity: 0;
+  transform: scale(0);
+  pointer-events: none;
+}
+
+.balloon {
+  position: relative;
+  width: 75%;
+  height: 85%;
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+  box-shadow: inset -8px -8px 20px rgba(0,0,0,0.3), 
+              0 10px 20px rgba(0,0,0,0.2);
+  cursor: pointer;
+  transform-origin: bottom center;
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Balloon Highlight Gloss */
+.balloon::before {
+  content: '';
+  position: absolute;
+  top: 10%;
+  left: 20%;
+  width: 25%;
+  height: 25%;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  transform: rotate(-30deg);
+}
+
+/* Balloon Knot */
+.balloon-knot {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 10px solid transparent; /* Colored dynamically */
+}
+
+/* Balloon String */
+.balloon-string {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  width: 2px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  transform-origin: top center;
+}
+
+/* Hover effects */
+.balloon:hover {
+  transform: scale(1.05);
+  box-shadow: inset -8px -8px 20px rgba(0,0,0,0.3), 
+              0 12px 25px rgba(255,255,255,0.1);
+  filter: brightness(1.1);
+}
+
+/* Popping Explosion Effect (Dynamic Shards) */
+.pop-particle {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  z-index: 10;
+  animation: popBlowout 0.6s ease-out forwards;
+}
+
+@keyframes popBlowout {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0.2);
+    opacity: 0;
+  }
+}
+
+/* Celebration Overlay / Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(6, 4, 15, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.prize-modal {
+  width: 500px;
+  max-width: 90%;
+  padding: 40px;
+  text-align: center;
+  transform: scale(0.7) translateY(50px);
+  transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-overlay.active .prize-modal {
+  transform: scale(1) translateY(0);
+}
+
+.modal-congrats {
+  font-size: 1.2rem;
+  color: var(--accent-cyan);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+}
+
+.modal-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 25px;
+  color: white;
+}
+
+.modal-prize-circle {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.15));
+  border: 2px solid var(--accent-purple);
+  box-shadow: 0 0 30px rgba(157, 78, 221, 0.3);
+  margin: 0 auto 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.5rem;
+  animation: modalGlowPulse 2s infinite alternate;
+}
+
+@keyframes modalGlowPulse {
+  0% { box-shadow: 0 0 25px rgba(157, 78, 221, 0.3), inset 0 0 15px rgba(157, 78, 221, 0.2); }
+  100% { box-shadow: 0 0 45px rgba(0, 242, 254, 0.6), inset 0 0 25px rgba(0, 242, 254, 0.4); border-color: var(--accent-cyan); }
+}
+
+.modal-prize-name {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 30px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+/* Flying Dart Animation */
+.flying-dart {
+  position: absolute;
+  width: 45px;
+  height: 18px;
+  z-index: 20;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 16' fill='none'%3E%3Cpath d='M44 8L30 1V7H12C11 7 10 6 10 5V3L1 8L10 13V11C10 10 11 9 12 9H30V15L44 8Z' fill='%23e67e22' stroke='%23ffbe76' stroke-width='1.5'/%3E%3Cpath d='M6 8L1 12.5V3.5L6 8Z' fill='%23e74c3c'/%3E%3Cpath d='M30 8H40' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  transition: transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
