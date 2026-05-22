@@ -199,7 +199,29 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Pick a random unpopped balloon
+    // Determine if it is a miss:
+    // If throw intensity is too low (< 0.6) or random 15% chance
+    const isMiss = (data.intensity < 0.6) || (Math.random() < 0.15);
+
+    if (isMiss) {
+      // Choose which balloon to fly towards (for a visual miss target)
+      const randomIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
+      
+      // Broadcast to host (to trigger miss flight animation)
+      io.to('host-room').emit('balloon-miss-trigger', {
+        index: randomIndex,
+        intensity: data.intensity || 1
+      });
+
+      // Send back miss status to the mobile client
+      socket.emit('throw-result', {
+        status: 'miss',
+        index: randomIndex
+      });
+      return;
+    }
+
+    // Pick a random unpopped balloon (Hit Success!)
     const randomIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
     gameState.popped[randomIndex] = true;
     saveGameState();

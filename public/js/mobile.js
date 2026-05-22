@@ -237,12 +237,27 @@ socket.on('disconnect', () => {
 
 // Receive result from backend throw request
 socket.on('throw-result', (data) => {
+  const resultTitle = document.getElementById('result-title');
+  const resultDesc = document.getElementById('result-desc');
+  
   if (data.status === 'success') {
     triggerHaptic('hit');
     
     // Show winner result overlay card
     setTimeout(() => {
+      if (resultTitle) resultTitle.innerText = "🎯 다트 명중!";
+      if (resultDesc) resultDesc.innerText = "획득한 경품은 바로...";
       resultPrize.innerText = data.prize;
+      resultOverlay.classList.add('active');
+    }, 700);
+  } else if (data.status === 'miss') {
+    triggerHaptic('throw'); // Short haptic pulse
+    
+    // Show miss result overlay card
+    setTimeout(() => {
+      if (resultTitle) resultTitle.innerText = "❌ 조준 실패!";
+      if (resultDesc) resultDesc.innerText = "아쉽게도 풍선을 비껴갔습니다.";
+      resultPrize.innerText = "다시 조준해서 던져보세요!";
       resultOverlay.classList.add('active');
     }, 700);
   } else {

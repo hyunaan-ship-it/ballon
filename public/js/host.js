@@ -26,40 +26,90 @@ class SoundSynth {
     if (!this.enabled) return;
     this.init();
     const ctx = this.ctx;
+    const now = ctx.currentTime;
     
-    // 1. Bass thump/boom (the low-frequency air release)
-    const boomOsc = ctx.createOscillator();
-    const boomGain = ctx.createGain();
-    boomOsc.connect(boomGain);
-    boomGain.connect(ctx.destination);
+    // Layer 1: Heavy Bass Thud (Sub-woofer impact)
+    const osc = ctx.createOscillator();
+    const bassGain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.35); // Deep sweep
     
-    boomOsc.type = 'sine';
-    boomOsc.frequency.setValueAtTime(160, ctx.currentTime);
-    boomOsc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.15);
+    bassGain.gain.setValueAtTime(2.2, now); // Super loud initial kick
+    bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
     
-    boomGain.gain.setValueAtTime(1.2, ctx.currentTime);
-    boomGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc.connect(bassGain);
+    bassGain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.36);
     
-    boomOsc.start();
-    boomOsc.stop(ctx.currentTime + 0.15);
+    // Layer 2: Loud white/pink noise burst (The physical tearing & exploding air sound)
+    const bufferSize = ctx.sampleRate * 0.45; 
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
     
-    // 2. High-frequency snap (the latex tearing)
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, now);
+    filter.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+    
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(2.8, now); // High initial level
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+    
+    noise.start(now);
+    noise.stop(now + 0.32);
+    
+    // Layer 3: High-frequency crack/snap
     const snapOsc = ctx.createOscillator();
     const snapGain = ctx.createGain();
+    snapOsc.type = 'sawtooth';
+    snapOsc.frequency.setValueAtTime(1200, now);
+    snapOsc.frequency.exponentialRampToValueAtTime(200, now + 0.06);
+    
+    snapGain.gain.setValueAtTime(1.8, now);
+    snapGain.gain.exponentialRampToValueAtTime(0.01, now + 0.07);
+    
     snapOsc.connect(snapGain);
     snapGain.connect(ctx.destination);
+    snapOsc.start(now);
+    snapOsc.stop(now + 0.08);
+  }
+
+  playMiss() {
+    if (!this.enabled) return;
+    this.init();
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
     
-    snapOsc.type = 'triangle';
-    snapOsc.frequency.setValueAtTime(450, ctx.currentTime);
-    snapOsc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.08);
+    // Low wooden thud sound
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
     
-    snapGain.gain.setValueAtTime(0.8, ctx.currentTime);
-    snapGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(120, now);
+    osc.frequency.exponentialRampToValueAtTime(10, now + 0.15);
     
-    snapOsc.start();
-    snapOsc.stop(ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(1.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
     
-    // 3. Sharp white noise pop snap (the explosive sound)
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start(now);
+    osc.stop(now + 0.16);
+    
+    // Short brush noise
     const bufferSize = ctx.sampleRate * 0.08;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -72,19 +122,18 @@ class SoundSynth {
     
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = 1000;
-    filter.Q.value = 2;
+    filter.frequency.value = 400;
     
     const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(1.5, ctx.currentTime);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    noiseGain.gain.setValueAtTime(0.3, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
     
     noise.connect(filter);
     filter.connect(noiseGain);
     noiseGain.connect(ctx.destination);
     
-    noise.start();
-    noise.stop(ctx.currentTime + 0.08);
+    noise.start(now);
+    noise.stop(now + 0.08);
   }
   
   playThrow() {
@@ -369,7 +418,7 @@ function spawnPopParticles(cellId, colorIndex) {
 }
 
 // Flying Dart Animation Engine
-function animateDartThrow(targetIndex, onComplete) {
+function animateDartThrow(targetIndex, onComplete, isMiss = false) {
   sounds.playThrow();
   
   const cellEl = document.getElementById(`cell-${targetIndex}`);
@@ -379,8 +428,12 @@ function animateDartThrow(targetIndex, onComplete) {
   }
   
   const targetRect = cellEl.getBoundingClientRect();
-  const targetX = targetRect.left + targetRect.width / 2;
-  const targetY = targetRect.top + targetRect.height / 2;
+  
+  // For a miss, hit slightly off-center (edge of the cell/board background)
+  const offsetX = isMiss ? (Math.random() > 0.5 ? 40 : -40) : 0;
+  const offsetY = isMiss ? (Math.random() > 0.5 ? 40 : -40) : 0;
+  const targetX = targetRect.left + targetRect.width / 2 + offsetX;
+  const targetY = targetRect.top + targetRect.height / 2 + offsetY;
   
   // Create flying dart element
   const dart = document.createElement('div');
@@ -399,10 +452,6 @@ function animateDartThrow(targetIndex, onComplete) {
   // Trigger DOM paint
   void dart.offsetWidth;
   
-  // Flight dynamics - curve throw
-  const midX = (startX + targetX) / 2;
-  const midY = (startY + targetY) / 2 - 150; // Arc peak
-  
   // Custom transition animation for beautiful trajectory
   dart.style.transition = 'left 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), top 0.6s cubic-bezier(0.21, 0.61, 0.35, 1), transform 0.6s linear';
   
@@ -416,20 +465,49 @@ function animateDartThrow(targetIndex, onComplete) {
   dart.style.transform = `translate(-50%, -50%) rotate(${angleDeg}deg) scale(1)`;
   
   setTimeout(() => {
-    // Hit impact - trigger shake on target cell
-    cellEl.style.transform = 'scale(0.9) rotate(5deg)';
-    sounds.playPop();
-    
-    // Explosion particles
-    spawnPopParticles(targetIndex, targetIndex);
-    
-    // Remove dart
-    dart.remove();
-    
-    setTimeout(() => {
-      cellEl.style.transform = '';
-      onComplete();
-    }, 150);
+    if (isMiss) {
+      // Miss visual feedback: dart bounces and falls down due to gravity
+      dart.style.transition = 'transform 0.4s ease-in, top 0.4s ease-in, opacity 0.4s ease-out';
+      dart.style.transform = `translate(-50%, -50%) rotate(${angleDeg + 90}deg) scale(0.8)`;
+      dart.style.top = `${targetY + 120}px`;
+      dart.style.opacity = '0';
+      
+      sounds.playMiss();
+      
+      // Brief board shake
+      const boardGrid = document.getElementById('balloon-grid');
+      if (boardGrid) {
+        boardGrid.style.transform = 'translate(4px, 4px)';
+        setTimeout(() => { boardGrid.style.transform = ''; }, 100);
+      }
+      
+      setTimeout(() => {
+        dart.remove();
+        onComplete();
+      }, 400);
+    } else {
+      // Hit impact - trigger shake on target cell
+      cellEl.style.transform = 'scale(0.95) rotate(4deg)';
+      
+      // Trigger premium balloon POP visual animation (balloon expands and bursts)
+      const balloonEl = cellEl.querySelector('.balloon');
+      if (balloonEl) {
+        balloonEl.classList.add('popping');
+      }
+      
+      sounds.playPop();
+      
+      // Explosion particles
+      spawnPopParticles(targetIndex, targetIndex);
+      
+      // Remove dart
+      dart.remove();
+      
+      setTimeout(() => {
+        cellEl.style.transform = '';
+        onComplete();
+      }, 150);
+    }
   }, 600);
 }
 
@@ -453,7 +531,7 @@ function executePop(index, prize) {
     modalPrizeEmoji.innerText = getPrizeEmoji(prize);
     modalPrizeText.innerText = prize;
     celebrationOverlay.classList.add('active');
-    // sounds.playVictory(); // Removed prize sound effect as requested
+    // Victory sound disabled per request
   }, 450);
 }
 
@@ -557,6 +635,13 @@ socket.on('balloon-pop-trigger', (data) => {
   animateDartThrow(data.index, () => {
     executePop(data.index, data.prize);
   });
+});
+
+socket.on('balloon-miss-trigger', (data) => {
+  // Trigger flying dart animation as a miss (isMiss = true)
+  animateDartThrow(data.index, () => {
+    // No popping logic, just complete
+  }, true);
 });
 
 // UI Event Listners
