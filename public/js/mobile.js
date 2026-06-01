@@ -215,8 +215,7 @@ skipPermBtn.addEventListener('click', () => {
 });
 
 resultConfirmBtn.addEventListener('click', () => {
-  resultOverlay.classList.remove('active');
-  resetDartVisuals();
+  SyncHelper.confirmPrizeClaim();
 });
 
 // Receive result from backend or Firebase throw request
@@ -285,6 +284,10 @@ if (!accountId) {
       console.log(`Mobile SyncHelper successfully established connection for Account ${accountId}`);
     },
     onReset: () => {
+      resultOverlay.classList.remove('active');
+      resetDartVisuals();
+    },
+    onPrizeConfirmed: () => {
       resultOverlay.classList.remove('active');
       resetDartVisuals();
     }

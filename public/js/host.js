@@ -412,6 +412,9 @@ if (!accountId) {
     },
     onMobileCount: (count) => {
       mobileCountVal.innerText = `${count}대 연결됨`;
+    },
+    onPrizeConfirmed: () => {
+      celebrationOverlay.classList.remove('active');
     }
   });
 }
@@ -624,7 +627,7 @@ function executePop(index, prize) {
 
 // UI Event Listeners
 modalCloseBtn.addEventListener('click', () => {
-  celebrationOverlay.classList.remove('active');
+  SyncHelper.confirmPrizeClaim();
 });
 
 celebrationOverlay.addEventListener('click', (e) => {

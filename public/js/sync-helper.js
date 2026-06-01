@@ -18,6 +18,7 @@ class BalloonSyncHelper {
     this.onResetCallback = null;
     this.onPopTriggerCallback = null; // Host/Mobile
     this.onMissTriggerCallback = null; // Host/Mobile
+    this.onPrizeConfirmedCallback = null; // Sync Confirmations
     
     this.lastProcessedThrowTime = 0;
     this.lastProcessedResponseTime = 0;
@@ -25,7 +26,7 @@ class BalloonSyncHelper {
     this.fallbackTimer = null;
   }
 
-  init({ role, accountId, onInit, onStateUpdate, onReset, onPopTrigger, onMissTrigger, onMobileCount }) {
+  init({ role, accountId, onInit, onStateUpdate, onReset, onPopTrigger, onMissTrigger, onMobileCount, onPrizeConfirmed }) {
     this.role = role;
     this.accountId = String(accountId || '1');
     this.room = getOrGenerateRoomId();
@@ -35,6 +36,7 @@ class BalloonSyncHelper {
     this.onPopTriggerCallback = onPopTrigger;
     this.onMissTriggerCallback = onMissTrigger;
     this.onMobileCountCallback = onMobileCount;
+    this.onPrizeConfirmedCallback = onPrizeConfirmed;
 
     console.log(`[SyncHelper] Initializing in ${this.mode.toUpperCase()} mode for Account ${this.accountId}, Room ${this.room}`);
 
@@ -110,6 +112,12 @@ class BalloonSyncHelper {
       this.socket.on('mobile-disconnected', (data) => {
         if (this.onMobileCountCallback) {
           this.onMobileCountCallback(data.count);
+        }
+      });
+
+      this.socket.on('prize-confirmed', () => {
+        if (this.onPrizeConfirmedCallback) {
+          this.onPrizeConfirmedCallback();
         }
       });
     } catch (e) {
@@ -193,6 +201,14 @@ class BalloonSyncHelper {
         const state = snapshot.val();
         if (state && this.onStateUpdateCallback) {
           this.onStateUpdateCallback(state);
+        }
+      });
+
+      // Listen for confirm prize claims (dismiss overlay)
+      accountRef.child('confirm_trigger').on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val && this.onPrizeConfirmedCallback) {
+          this.onPrizeConfirmedCallback();
         }
       });
 
@@ -393,6 +409,20 @@ class BalloonSyncHelper {
       ...result,
       timestamp: Date.now()
     });
+  }
+
+  // Confirm Prize Claim across all participants (Mobile result card + Host celebration card)
+  confirmPrizeClaim() {
+    if (this.mode === 'socket') {
+      this.socket.emit('confirm-prize-claim');
+    } else if (this.mode === 'local-fallback') {
+      if (this.onPrizeConfirmedCallback) {
+        this.onPrizeConfirmedCallback();
+      }
+    } else {
+      const accountRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}`);
+      accountRef.child('confirm_trigger').set({ timestamp: Date.now() });
+    }
   }
 
   // --- ACTIONS ---

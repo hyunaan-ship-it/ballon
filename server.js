@@ -302,6 +302,13 @@ io.on('connection', (socket) => {
     io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
   });
 
+  // Mobile/Host confirms prize claim (sync dismiss)
+  socket.on('confirm-prize-claim', () => {
+    const accountId = socket.accountId || '1';
+    console.log(`Prize claim confirmed on Account ${accountId}`);
+    io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).to(`admin-room-${accountId}`).emit('prize-confirmed');
+  });
+
   // Direct pop from Host (click balloon directly as fallback)
   socket.on('host-direct-pop', (index) => {
     const accountId = socket.accountId || '1';
