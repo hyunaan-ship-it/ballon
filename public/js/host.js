@@ -745,3 +745,40 @@ editSaveBtn.addEventListener('click', () => {
   editPrizesOverlay.classList.remove('active');
   alert("🎉 경품 수정사항이 성공적으로 저장 및 실시간 live 동기화되었습니다!");
 });
+
+// Handle Sync fallback notification for a stellar user guidance!
+window.addEventListener('sync-fallback-active', (e) => {
+  const alertBanner = document.createElement('div');
+  alertBanner.className = 'glass-panel';
+  alertBanner.style.position = 'fixed';
+  alertBanner.style.bottom = '24px';
+  alertBanner.style.right = '24px';
+  alertBanner.style.width = '380px';
+  alertBanner.style.padding = '18px 22px';
+  alertBanner.style.borderRadius = '16px';
+  alertBanner.style.border = '1px solid rgba(255, 193, 7, 0.3)';
+  alertBanner.style.background = 'rgba(25, 15, 5, 0.9)';
+  alertBanner.style.color = '#fff';
+  alertBanner.style.zIndex = '99999';
+  alertBanner.style.fontSize = '0.85rem';
+  alertBanner.style.lineHeight = '1.5';
+  alertBanner.style.boxShadow = '0 20px 40px rgba(0,0,0,0.6)';
+  
+  alertBanner.innerHTML = `
+    <div style="font-weight: 800; font-size: 0.98rem; color: #ffc107; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+      ⚠️ Firebase 연동 실패 (오프라인 모드 실행)
+    </div>
+    <div>
+      설정된 Firebase 실시간 데이터베이스(<code>${e.detail.databaseURL}</code>) 연결이 방화벽에 차단되었거나 유효하지 않아 <strong>로컬 오프라인 모드</strong>로 전환되었습니다.<br><br>
+      이 화면에서 풍선 터트리기 시뮬레이션은 정상 플레이 가능하지만, 모바일 연동 기능을 사용하려면 <strong>public/js/firebase-config.js</strong>에 본인의 실제 Firebase <code>databaseURL</code>을 적용해 주세요.
+    </div>
+    <button onclick="this.parentElement.remove()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #aaa; cursor: pointer; font-weight: bold; font-size: 1.1rem; transition: color 0.2s;">×</button>
+  `;
+  
+  // Style absolute hover close
+  const closeBtn = alertBanner.querySelector('button');
+  closeBtn.onmouseover = () => closeBtn.style.color = '#fff';
+  closeBtn.onmouseout = () => closeBtn.style.color = '#aaa';
+  
+  document.body.appendChild(alertBanner);
+});
