@@ -5,7 +5,7 @@ const SYNC_CONFIG = {
   // Sync mode: 'socket' or 'firebase'
   // - 'socket': Uses your local Express Node.js server + Socket.io (best for local network testing)
   // - 'firebase': Uses serverless Firebase Realtime Database (best for deploying to Vercel with ZERO cold start times!)
-  mode: 'firebase', 
+  mode: (window.location.hostname.includes('vercel.app') || window.location.href.includes('mode=firebase')) ? 'firebase' : 'socket', 
 
   // Firebase Realtime Database configuration (used when mode is 'firebase')
   // We provide a pre-configured public database so it works out-of-the-box!

@@ -337,13 +337,22 @@ if (!accountId) {
       serverPopped = data.popped;
       renderBoard();
       
+      // Dynamic Mobile URL detection to support local offline networks, corporate Wi-Fi, and public tunnels (like ngrok) simultaneously!
+      let mobileUrl = data.mobileUrl;
+      
+      if (SYNC_CONFIG.mode === 'socket') {
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+          mobileUrl = window.location.origin + `/mobile.html?account=${accountId}`;
+        }
+      }
+      
       // QR Code Generation
       const qrBox = document.getElementById('qrcode-box');
       qrBox.innerHTML = '';
       
       try {
         new QRCode(qrBox, {
-          text: data.mobileUrl,
+          text: mobileUrl,
           width: 150,
           height: 150,
           colorDark: '#130d22',
@@ -351,9 +360,9 @@ if (!accountId) {
           correctLevel: QRCode.CorrectLevel.H
         });
         
-        document.getElementById('qr-address-desc').innerHTML = `모바일 다트 접속 URL:<br><a href="${data.mobileUrl}" target="_blank" style="color: var(--accent-cyan); font-weight: 700; text-decoration: none; word-break: break-all;">${data.mobileUrl}</a>`;
+        document.getElementById('qr-address-desc').innerHTML = `모바일 다트 접속 URL:<br><a href="${mobileUrl}" target="_blank" style="color: var(--accent-cyan); font-weight: 700; text-decoration: none; word-break: break-all;">${mobileUrl}</a>`;
         
-        const simplifiedUrl = data.mobileUrl.replace('http://', '').replace('https://', '');
+        const simplifiedUrl = mobileUrl.replace('http://', '').replace('https://', '');
         const manualUrlEl = document.getElementById('manual-url-text');
         if (manualUrlEl) {
           manualUrlEl.innerText = simplifiedUrl;
