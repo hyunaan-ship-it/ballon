@@ -6,20 +6,48 @@
   <title>⚙️ 운영자 경품 편집기 - 풍선터트리기</title>
   <link rel="stylesheet" href="css/common.css">
   <link rel="stylesheet" href="css/admin.css">
-  <!-- Socket.io Client -->
-  <script src="/socket.io/socket.io.js"></script>
+  
+  <!-- Firebase Core SDK and Database Compatibility -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  
+  <!-- Config and Sync Layer -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/sync-helper.js"></script>
+  
+  <!-- Script loader for Socket.io -->
+  <script>
+    if (SYNC_CONFIG.mode === 'socket') {
+      const script = document.createElement('script');
+      script.src = '/socket.io/socket.io.js';
+      document.head.appendChild(script);
+    }
+  </script>
 </head>
 <body>
 
   <div class="admin-container">
     <!-- Header Area -->
     <header class="admin-header">
-      <div>
-        <h1>⚙️ 게임 운영 설정</h1>
-        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 5px;">풍선 뒤에 숨겨진 25개의 경품을 설정하고 게임판을 관리합니다.</p>
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <div>
+          <h1>⚙️ 게임 운영 설정</h1>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 5px;">풍선 뒤에 숨겨진 25개의 경품을 설정하고 게임판을 관리합니다.</p>
+        </div>
+        
+        <!-- Account Switcher Pill Selector for Admin -->
+        <div class="account-switcher glass-panel" style="padding: 8px 12px; border-radius: 12px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.02);">
+          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">운영 계정:</span>
+          <div style="display: flex; gap: 4px;" id="account-pills-container">
+            <button class="pill-btn" data-acc="1" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">1</button>
+            <button class="pill-btn" data-acc="2" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">2</button>
+            <button class="pill-btn" data-acc="3" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">3</button>
+            <button class="pill-btn" data-acc="4" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">4</button>
+          </div>
+        </div>
       </div>
       <div>
-        <a href="/" class="btn-secondary" style="text-decoration: none; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px;">
+        <a href="/" id="host-view-link" class="btn-secondary" style="text-decoration: none; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px;">
           🖥️ 메인 풍선판 보기
         </a>
       </div>
@@ -88,6 +116,39 @@
 
       </aside>
 
+    </div>
+  </div>
+
+  <!-- Fullscreen Account Selector Overlay (Visible initially if no account selected) -->
+  <div class="modal-overlay active" id="account-select-overlay" style="display: none;">
+    <div class="glass-panel" style="width: 550px; max-width: 90%; padding: 40px 30px; text-align: center; display: flex; flex-direction: column; gap: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border-radius: 20px;">
+      <div>
+        <h2 style="font-size: 2.2rem; font-weight: 800; background: linear-gradient(45deg, #00f2fe, #9d4edd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px;">⚙️ 운영자 계정 선택</h2>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5;">관리하고 편집할 게임판 계정을 선택해주세요.<br>선택한 계정의 풍선 상태와 경품이 동기화됩니다.</p>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+        <button class="account-card-btn" data-account="1">
+          <span class="card-icon">01</span>
+          <span class="card-title">계정 1</span>
+          <span class="card-desc">연동 게임판 1</span>
+        </button>
+        <button class="account-card-btn" data-account="2">
+          <span class="card-icon">02</span>
+          <span class="card-title">계정 2</span>
+          <span class="card-desc">연동 게임판 2</span>
+        </button>
+        <button class="account-card-btn" data-account="3">
+          <span class="card-icon">03</span>
+          <span class="card-title">계정 3</span>
+          <span class="card-desc">연동 게임판 3</span>
+        </button>
+        <button class="account-card-btn" data-account="4">
+          <span class="card-icon">04</span>
+          <span class="card-title">계정 4</span>
+          <span class="card-desc">연동 게임판 4</span>
+        </button>
+      </div>
     </div>
   </div>
 

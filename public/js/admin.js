@@ -1,5 +1,5 @@
 // Real-Time Motion Balloon Popping Game - Admin Script
-const socket = io();
+// Connection is dynamically managed by SyncHelper below.
 
 // Store live states
 let currentPrizes = [];
@@ -70,7 +70,7 @@ function syncUIWithData() {
         statusTag.onclick = (e) => {
           e.preventDefault();
           if (confirm(`${i + 1}번 풍선을 다시 살아있는(안 터진) 상태로 복구하시겠습니까?`)) {
-            socket.emit('admin-toggle-pop', i);
+            SyncHelper.togglePop(i);
           }
         };
       } else {
@@ -160,39 +160,79 @@ saveBtn.addEventListener('click', (e) => {
     }
   }
   
-  socket.emit('admin-update-prizes', updatedPrizes);
+  SyncHelper.updatePrizes(updatedPrizes);
   alert("🎉 경품 수정사항이 성공적으로 저장 및 live 동기화되었습니다!");
 });
 
 // Reset and Shuffle operations
 opResetBtn.addEventListener('click', () => {
   if (confirm("정말 모든 풍선판을 리셋하시겠습니까? (현재 배치된 경품 내용은 그대로 유지됩니다)")) {
-    socket.emit('admin-reset-board', { shuffle: false });
+    SyncHelper.resetBoard({ shuffle: false });
     alert("풍선판이 정상적으로 초기화되었습니다!");
   }
 });
 
 opShuffleBtn.addEventListener('click', () => {
   if (confirm("정말 풍선판 리셋 및 경품 랜덤 셔플을 진행하시겠습니까? (경품들의 위치가 25개 칸에 무작위로 재배치됩니다)")) {
-    socket.emit('admin-reset-board', { shuffle: true });
+    SyncHelper.resetBoard({ shuffle: true });
     alert("풍선판이 리셋되고 경품들이 무작위로 뒤섞였습니다!");
   }
 });
 
-// Socket Event Receivers
-socket.on('connect', () => {
-  console.log("Admin socket connected");
-});
+// --- Account Selection Overlay & Switcher Routing ---
+const urlParams = new URLSearchParams(window.location.search);
+let accountId = urlParams.get('account');
+let room = urlParams.get('room') || getOrGenerateRoomId();
 
-socket.on('init-state', (data) => {
-  currentPrizes = data.prizes;
-  currentPopped = data.popped;
-  buildGridStructure();
-  syncUIWithData();
-});
+const accountOverlay = document.getElementById('account-select-overlay');
 
-socket.on('state-updated', (data) => {
-  currentPrizes = data.prizes;
-  currentPopped = data.popped;
-  syncUIWithData();
-});
+if (!accountId) {
+  // Show stunning glass selector overlay
+  accountOverlay.style.display = 'flex';
+  
+  document.querySelectorAll('.account-card-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const selectedAcc = btn.getAttribute('data-account');
+      window.location.search = `?room=${room}&account=${selectedAcc}`;
+    });
+  });
+} else {
+  // Dismiss selector overlay
+  accountOverlay.style.display = 'none';
+  
+  // Highlight active top header switcher pill button
+  document.querySelectorAll('.pill-btn').forEach(pill => {
+    const acc = pill.getAttribute('data-acc');
+    if (acc === accountId) {
+      pill.classList.add('active');
+    }
+    
+    pill.addEventListener('click', () => {
+      window.location.search = `?room=${room}&account=${acc}`;
+    });
+  });
+  
+  // Update view host screen navigation link
+  const hostViewLink = document.getElementById('host-view-link');
+  if (hostViewLink) {
+    hostViewLink.href = `/?room=${room}&account=${accountId}`;
+  }
+  
+  // Initialize Unified Sync Layer!
+  SyncHelper.init({
+    role: 'admin',
+    accountId: accountId,
+    onInit: (data) => {
+      currentPrizes = data.prizes;
+      currentPopped = data.popped;
+      buildGridStructure();
+      syncUIWithData();
+      console.log(`Admin SyncHelper successfully loaded data for Account ${accountId}`);
+    },
+    onStateUpdate: (data) => {
+      currentPrizes = data.prizes;
+      currentPopped = data.popped;
+      syncUIWithData();
+    }
+  });
+}

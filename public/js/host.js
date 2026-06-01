@@ -1,5 +1,5 @@
 // Real-Time Motion Balloon Popping Game - Host Script
-const socket = io();
+// Connection is dynamically managed by SyncHelper below.
 
 // Sound Synthesizer using Web Audio API
 class SoundSynth {
@@ -294,7 +294,120 @@ const modalCloseBtn = document.getElementById('modal-close-btn');
 const soundBtn = document.getElementById('sound-btn');
 const resetBtn = document.getElementById('reset-btn');
 
-// Initialize the 5x5 layout
+// --- Account & Multi-Tenant Routing UI ---
+const urlParams = new URLSearchParams(window.location.search);
+let accountId = urlParams.get('account');
+const room = getOrGenerateRoomId();
+
+const accountOverlay = document.getElementById('account-select-overlay');
+
+if (!accountId) {
+  // Show stunning selection overlay
+  accountOverlay.style.display = 'flex';
+  
+  // Attach select handlers to cards
+  document.querySelectorAll('.account-card-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const selectedAcc = btn.getAttribute('data-account');
+      window.location.search = `?room=${room}&account=${selectedAcc}`;
+    });
+  });
+} else {
+  // Dismiss overlay
+  accountOverlay.style.display = 'none';
+  
+  // Highlight active pill switcher
+  document.querySelectorAll('.pill-btn').forEach(pill => {
+    const acc = pill.getAttribute('data-acc');
+    if (acc === accountId) {
+      pill.classList.add('active');
+    }
+    
+    pill.addEventListener('click', () => {
+      window.location.search = `?room=${room}&account=${acc}`;
+    });
+  });
+  
+  // Initialize Unified Sync Layer!
+  SyncHelper.init({
+    role: 'host',
+    accountId: accountId,
+    onInit: (data) => {
+      serverPrizes = data.prizes;
+      serverPopped = data.popped;
+      renderBoard();
+      
+      // QR Code Generation
+      const qrBox = document.getElementById('qrcode-box');
+      qrBox.innerHTML = '';
+      
+      try {
+        new QRCode(qrBox, {
+          text: data.mobileUrl,
+          width: 150,
+          height: 150,
+          colorDark: '#130d22',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+        
+        document.getElementById('qr-address-desc').innerHTML = `모바일 다트 접속 URL:<br><a href="${data.mobileUrl}" target="_blank" style="color: var(--accent-cyan); font-weight: 700; text-decoration: none; word-break: break-all;">${data.mobileUrl}</a>`;
+        
+        const simplifiedUrl = data.mobileUrl.replace('http://', '').replace('https://', '');
+        const manualUrlEl = document.getElementById('manual-url-text');
+        if (manualUrlEl) {
+          manualUrlEl.innerText = simplifiedUrl;
+        }
+      } catch (err) {
+        console.error("QR Code Generation failed:", err);
+      }
+    },
+    onStateUpdate: (data) => {
+      serverPrizes = data.prizes;
+      serverPopped = data.popped;
+      
+      // Real-time cell state mapping
+      for (let i = 0; i < 25; i++) {
+        const cell = document.getElementById(`cell-${i}`);
+        if (cell) {
+          if (serverPopped[i] && !cell.classList.contains('popped')) {
+            cell.classList.add('popped');
+          } else if (!serverPopped[i] && cell.classList.contains('popped')) {
+            cell.classList.remove('popped');
+          }
+          
+          const nameEl = cell.querySelector('.prize-name');
+          const iconEl = cell.querySelector('.prize-icon');
+          if (nameEl && iconEl) {
+            nameEl.innerText = serverPrizes[i];
+            iconEl.innerText = getPrizeEmoji(serverPrizes[i]);
+          }
+        }
+      }
+      
+      const unpoppedCount = serverPopped.filter(p => !p).length;
+      poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / 25`;
+    },
+    onReset: () => {
+      serverPopped = Array(25).fill(false);
+      renderBoard();
+      celebrationOverlay.classList.remove('active');
+    },
+    onPopTrigger: (data) => {
+      animateDartThrow(data.index, () => {
+        executePop(data.index, data.prize);
+      });
+    },
+    onMissTrigger: (data) => {
+      animateDartThrow(data.index, () => {}, true);
+    },
+    onMobileCount: (count) => {
+      mobileCountVal.innerText = `${count}대 연결됨`;
+    }
+  });
+}
+
+// Modify balloon direct click listener to use SyncHelper
 function renderBoard() {
   gridEl.innerHTML = '';
   
@@ -303,12 +416,10 @@ function renderBoard() {
     const prize = serverPrizes[i] || '경품';
     const colorIndex = i % balloonColors.length;
     
-    // Outer Grid Cell
     const cell = document.createElement('div');
     cell.className = `grid-cell ${isPopped ? 'popped' : ''}`;
     cell.id = `cell-${i}`;
     
-    // Background Prize Layer
     const prizeCard = document.createElement('div');
     prizeCard.className = 'prize-card';
     
@@ -328,14 +439,12 @@ function renderBoard() {
     prizeCard.appendChild(prizeIcon);
     prizeCard.appendChild(prizeName);
     
-    // Foreground Balloon Layer
     const balloonWrapper = document.createElement('div');
     balloonWrapper.className = 'balloon-wrapper';
     
     const balloon = document.createElement('div');
     balloon.className = 'balloon';
     balloon.style.background = balloonColors[colorIndex];
-    // Slightly randomize float animations so they drift naturally
     balloon.style.animationDelay = `${(i * 0.15).toFixed(2)}s`;
     balloon.style.animationDuration = `${(3.5 + (i % 3) * 0.4).toFixed(2)}s`;
     
@@ -350,21 +459,18 @@ function renderBoard() {
     balloon.appendChild(string);
     balloonWrapper.appendChild(balloon);
     
-    // Assemble Cell
     cell.appendChild(prizeCard);
     cell.appendChild(balloonWrapper);
     
-    // Click balloon direct pop action
     balloon.addEventListener('click', (e) => {
       e.stopPropagation();
       sounds.init();
-      socket.emit('host-direct-pop', i);
+      SyncHelper.hostDirectPop(i);
     });
     
     gridEl.appendChild(cell);
   }
   
-  // Update UI ratio
   const unpoppedCount = serverPopped.filter(p => !p).length;
   poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / 25`;
 }
@@ -381,20 +487,17 @@ function spawnPopParticles(cellId, colorIndex) {
   const centerY = rect.height / 2;
   const color = balloonKnotColors[colorIndex % balloonKnotColors.length];
   
-  // Spawn 32 individual fragments
   for (let i = 0; i < 32; i++) {
     const particle = document.createElement('div');
     particle.className = 'pop-particle';
     particle.style.background = color;
     
-    // Shard size variation
     const size = Math.random() * 10 + 5;
     particle.style.width = `${size}px`;
     particle.style.height = `${size}px`;
     particle.style.left = `${centerX}px`;
     particle.style.top = `${centerY}px`;
     
-    // Send shards in 360-degree vectors
     const angle = Math.random() * Math.PI * 2;
     const distance = Math.random() * 140 + 40;
     const dx = Math.cos(angle) * distance;
@@ -403,10 +506,9 @@ function spawnPopParticles(cellId, colorIndex) {
     particle.style.setProperty('--dx', `${dx}px`);
     particle.style.setProperty('--dy', `${dy}px`);
     
-    // Custom random rotate and border radius for organic shape
     particle.style.transform = `rotate(${Math.random() * 360}deg)`;
     if (Math.random() > 0.5) {
-      particle.style.borderRadius = '2px'; // rigid balloon shards
+      particle.style.borderRadius = '2px';
     }
     
     container.appendChild(particle);
@@ -428,18 +530,14 @@ function animateDartThrow(targetIndex, onComplete, isMiss = false) {
   }
   
   const targetRect = cellEl.getBoundingClientRect();
-  
-  // For a miss, hit slightly off-center (edge of the cell/board background)
   const offsetX = isMiss ? (Math.random() > 0.5 ? 40 : -40) : 0;
   const offsetY = isMiss ? (Math.random() > 0.5 ? 40 : -40) : 0;
   const targetX = targetRect.left + targetRect.width / 2 + offsetX;
   const targetY = targetRect.top + targetRect.height / 2 + offsetY;
   
-  // Create flying dart element
   const dart = document.createElement('div');
   dart.className = 'flying-dart';
   
-  // Spawn dart from bottom-left corner of the screen
   const startX = 0;
   const startY = window.innerHeight;
   
@@ -448,25 +546,18 @@ function animateDartThrow(targetIndex, onComplete, isMiss = false) {
   dart.style.transform = `translate(-50%, -50%) rotate(-45deg) scale(0.5)`;
   
   document.body.appendChild(dart);
-  
-  // Trigger DOM paint
   void dart.offsetWidth;
   
-  // Custom transition animation for beautiful trajectory
   dart.style.transition = 'left 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), top 0.6s cubic-bezier(0.21, 0.61, 0.35, 1), transform 0.6s linear';
-  
-  // Direct fly to target
   dart.style.left = `${targetX}px`;
   dart.style.top = `${targetY}px`;
   
-  // Rotates dynamically during flight to point at target
   const angleRad = Math.atan2(targetY - startY, targetX - startX);
   const angleDeg = angleRad * (180 / Math.PI);
   dart.style.transform = `translate(-50%, -50%) rotate(${angleDeg}deg) scale(1)`;
   
   setTimeout(() => {
     if (isMiss) {
-      // Miss visual feedback: dart bounces and falls down due to gravity
       dart.style.transition = 'transform 0.4s ease-in, top 0.4s ease-in, opacity 0.4s ease-out';
       dart.style.transform = `translate(-50%, -50%) rotate(${angleDeg + 90}deg) scale(0.8)`;
       dart.style.top = `${targetY + 120}px`;
@@ -474,7 +565,6 @@ function animateDartThrow(targetIndex, onComplete, isMiss = false) {
       
       sounds.playMiss();
       
-      // Brief board shake
       const boardGrid = document.getElementById('balloon-grid');
       if (boardGrid) {
         boardGrid.style.transform = 'translate(4px, 4px)';
@@ -486,21 +576,15 @@ function animateDartThrow(targetIndex, onComplete, isMiss = false) {
         onComplete();
       }, 400);
     } else {
-      // Hit impact - trigger shake on target cell
       cellEl.style.transform = 'scale(0.95) rotate(4deg)';
       
-      // Trigger premium balloon POP visual animation (balloon expands and bursts)
       const balloonEl = cellEl.querySelector('.balloon');
       if (balloonEl) {
         balloonEl.classList.add('popping');
       }
       
       sounds.playPop();
-      
-      // Explosion particles
       spawnPopParticles(targetIndex, targetIndex);
-      
-      // Remove dart
       dart.remove();
       
       setTimeout(() => {
@@ -513,138 +597,23 @@ function animateDartThrow(targetIndex, onComplete, isMiss = false) {
 
 // Pop Execution & Modal Trigger
 function executePop(index, prize) {
-  // Flag as popped locally to trigger CSS state
   serverPopped[index] = true;
-  
-  // Render popped status inside the cell
   const cell = document.getElementById(`cell-${index}`);
   if (cell) {
     cell.classList.add('popped');
   }
   
-  // Update count
   const unpoppedCount = serverPopped.filter(p => !p).length;
   poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / 25`;
   
-  // Show large celebratory modal
   setTimeout(() => {
     modalPrizeEmoji.innerText = getPrizeEmoji(prize);
     modalPrizeText.innerText = prize;
     celebrationOverlay.classList.add('active');
-    // Victory sound disabled per request
   }, 450);
 }
 
-// Initial run to render colorful balloons immediately on load
-renderBoard();
-
-// Socket Event Receivers
-socket.on('connect', () => {
-  console.log("Connected to local socket server");
-  socket.emit('join-host');
-});
-
-socket.on('init-state', (data) => {
-  serverPrizes = data.prizes;
-  serverPopped = data.popped;
-  renderBoard();
-  
-  // Generate QR Code dynamically based on CURRENT browser's domain!
-  // This supports localhost, local network IPs, and cellular-accessible public tunnels (like ngrok) automatically!
-  const qrBox = document.getElementById('qrcode-box');
-  qrBox.innerHTML = '';
-  
-  const currentOrigin = window.location.origin;
-  let mobileUrl = currentOrigin + '/mobile.html';
-  
-  // If Host is opened on localhost, fall back to the server's detected local IP URL 
-  // so mobile devices on the same Wi-Fi can connect.
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    if (data.mobileUrl) {
-      mobileUrl = data.mobileUrl;
-    }
-  }
-  
-  try {
-    new QRCode(qrBox, {
-      text: mobileUrl,
-      width: 150,
-      height: 150,
-      colorDark: '#130d22',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.H
-    });
-    
-    document.getElementById('qr-address-desc').innerHTML = `모바일 다트 접속 URL:<br><a href="${mobileUrl}" target="_blank" style="color: var(--accent-cyan); font-weight: 700; text-decoration: none; word-break: break-all;">${mobileUrl}</a>`;
-    
-    // Update the simple typable address for manual connection
-    const simplifiedUrl = mobileUrl.replace('http://', '').replace('/mobile.html', '');
-    const manualUrlEl = document.getElementById('manual-url-text');
-    if (manualUrlEl) {
-      manualUrlEl.innerText = simplifiedUrl;
-    }
-  } catch (err) {
-    console.error("QR Code Generation failed:", err);
-  }
-});
-
-socket.on('mobile-connected', (data) => {
-  mobileCountVal.innerText = `${data.count}대 연결됨`;
-});
-
-socket.on('mobile-disconnected', (data) => {
-  mobileCountVal.innerText = `${data.count}대 연결됨`;
-});
-
-socket.on('state-updated', (data) => {
-  serverPrizes = data.prizes;
-  serverPopped = data.popped;
-  
-  // If the popped state changed, apply it
-  for (let i = 0; i < 25; i++) {
-    const cell = document.getElementById(`cell-${i}`);
-    if (cell) {
-      if (serverPopped[i] && !cell.classList.contains('popped')) {
-        cell.classList.add('popped');
-      } else if (!serverPopped[i] && cell.classList.contains('popped')) {
-        cell.classList.remove('popped');
-      }
-      
-      // Update names behind just in case admin changed it live
-      const nameEl = cell.querySelector('.prize-name');
-      const iconEl = cell.querySelector('.prize-icon');
-      if (nameEl && iconEl) {
-        nameEl.innerText = serverPrizes[i];
-        iconEl.innerText = getPrizeEmoji(serverPrizes[i]);
-      }
-    }
-  }
-  
-  const unpoppedCount = serverPopped.filter(p => !p).length;
-  poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / 25`;
-});
-
-socket.on('board-reset', () => {
-  serverPopped = Array(25).fill(false);
-  renderBoard();
-  celebrationOverlay.classList.remove('active');
-});
-
-socket.on('balloon-pop-trigger', (data) => {
-  // Trigger flying dart animation first, then execute pop
-  animateDartThrow(data.index, () => {
-    executePop(data.index, data.prize);
-  });
-});
-
-socket.on('balloon-miss-trigger', (data) => {
-  // Trigger flying dart animation as a miss (isMiss = true)
-  animateDartThrow(data.index, () => {
-    // No popping logic, just complete
-  }, true);
-});
-
-// UI Event Listners
+// UI Event Listeners
 modalCloseBtn.addEventListener('click', () => {
   celebrationOverlay.classList.remove('active');
 });
@@ -655,7 +624,6 @@ celebrationOverlay.addEventListener('click', (e) => {
   }
 });
 
-// Sound Toggle control
 soundBtn.addEventListener('click', () => {
   sounds.init();
   const enabled = sounds.toggle();
@@ -663,20 +631,17 @@ soundBtn.addEventListener('click', () => {
   soundBtn.className = enabled ? 'btn-secondary' : 'btn-secondary muted';
   
   if (enabled) {
-    // play a soft initialization sound
     sounds.playPop();
   }
 });
 
-// Host direct Reset trigger
 resetBtn.addEventListener('click', () => {
   sounds.init();
   if (confirm("정말 모든 풍선판을 초기화하시겠습니까? (숨겨진 경품 내역은 유지됩니다)")) {
-    socket.emit('admin-reset-board', { shuffle: false });
+    SyncHelper.resetBoard({ shuffle: false });
   }
 });
 
-// Resume AudioContext on body interaction
 document.body.addEventListener('click', () => {
   sounds.init();
 }, { once: true });
@@ -689,7 +654,6 @@ const editSaveBtn = document.getElementById('edit-save-btn');
 const editPresetBtn = document.getElementById('edit-preset-btn');
 const modalInputsGrid = document.getElementById('modal-inputs-grid');
 
-// Build the editor inputs
 function buildEditorInputs() {
   modalInputsGrid.innerHTML = '';
   for (let i = 0; i < 25; i++) {
@@ -730,14 +694,12 @@ function buildEditorInputs() {
   }
 }
 
-// Hook up opening event
 editPrizesBtn.addEventListener('click', () => {
   sounds.init();
   buildEditorInputs();
   editPrizesOverlay.classList.add('active');
 });
 
-// Hook up closing event
 editCloseBtn.addEventListener('click', () => {
   editPrizesOverlay.classList.remove('active');
 });
@@ -748,7 +710,6 @@ editPrizesOverlay.addEventListener('click', (e) => {
   }
 });
 
-// Preset event
 editPresetBtn.addEventListener('click', () => {
   const balancedPreset = [
     "스타벅스 커피", "문화상품권 1만원", "꽝 (아쉬워요!)", "치킨 쿠폰", "꽝 (아쉬워요!)",
@@ -765,14 +726,13 @@ editPresetBtn.addEventListener('click', () => {
   }
 });
 
-// Save event
 editSaveBtn.addEventListener('click', () => {
   const updatedPrizes = [];
   for (let i = 0; i < 25; i++) {
     const input = document.getElementById(`modal-prize-input-${i}`);
     updatedPrizes.push(input ? input.value.trim() || '꽝' : '꽝');
   }
-  socket.emit('admin-update-prizes', updatedPrizes);
+  SyncHelper.updatePrizes(updatedPrizes);
   editPrizesOverlay.classList.remove('active');
   alert("🎉 경품 수정사항이 성공적으로 저장 및 실시간 live 동기화되었습니다!");
 });

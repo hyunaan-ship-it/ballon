@@ -6,8 +6,23 @@
   <title>🎯 모바일 다트 컨트롤러</title>
   <link rel="stylesheet" href="css/common.css">
   <link rel="stylesheet" href="css/mobile.css">
-  <!-- Socket.io Client -->
-  <script src="/socket.io/socket.io.js"></script>
+  
+  <!-- Firebase Core SDK and Database Compatibility -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  
+  <!-- Config and Sync Layer -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/sync-helper.js"></script>
+  
+  <!-- Script loader for Socket.io -->
+  <script>
+    if (SYNC_CONFIG.mode === 'socket') {
+      const script = document.createElement('script');
+      script.src = '/socket.io/socket.io.js';
+      document.head.appendChild(script);
+    }
+  </script>
 </head>
 <body>
 
@@ -107,6 +122,35 @@
     <button class="btn-primary" id="result-confirm-btn" style="margin-top: 20px; width: 100%; justify-content: center; padding: 10px 20px;">
       다시 준비하기
     </button>
+  </div>
+
+  <!-- Fullscreen Mobile Account Selector Overlay (Visible initially if no account selected) -->
+  <div class="permission-overlay active" id="account-select-overlay" style="display: none; z-index: 1000;">
+    <div class="permission-card glass-panel" style="width: 90%; max-width: 360px; padding: 30px 20px; text-align: center; display: flex; flex-direction: column; gap: 20px;">
+      <div>
+        <h3 style="font-size: 1.5rem; font-weight: 800; background: linear-gradient(45deg, #00f2fe, #9d4edd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px;">🎈 모바일 다트 계정 선택</h3>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">연결할 호스트의 계정 번호를<br>선택해주세요.</p>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%;">
+        <button class="account-card-btn" data-account="1" style="width: 100%; padding: 15px 5px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: white; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <span style="font-size: 1.3rem; font-weight: 800; color: var(--accent-cyan);">01</span>
+          <span style="font-size: 0.9rem; font-weight: 700;">계정 1</span>
+        </button>
+        <button class="account-card-btn" data-account="2" style="width: 100%; padding: 15px 5px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: white; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <span style="font-size: 1.3rem; font-weight: 800; color: var(--accent-cyan);">02</span>
+          <span style="font-size: 0.9rem; font-weight: 700;">계정 2</span>
+        </button>
+        <button class="account-card-btn" data-account="3" style="width: 100%; padding: 15px 5px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: white; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <span style="font-size: 1.3rem; font-weight: 800; color: var(--accent-cyan);">03</span>
+          <span style="font-size: 0.9rem; font-weight: 700;">계정 3</span>
+        </button>
+        <button class="account-card-btn" data-account="4" style="width: 100%; padding: 15px 5px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: white; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <span style="font-size: 1.3rem; font-weight: 800; color: var(--accent-cyan);">04</span>
+          <span style="font-size: 0.9rem; font-weight: 700;">계정 4</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <script src="js/mobile.js"></script>

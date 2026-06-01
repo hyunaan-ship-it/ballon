@@ -1,5 +1,5 @@
 // Real-Time Motion Balloon Popping Game - Mobile Script
-const socket = io();
+// Connection is dynamically managed by SyncHelper below.
 
 // State variables
 let canThrow = true;
@@ -68,9 +68,9 @@ function triggerThrow(intensity = 1.0) {
   dartPin.style.transform = 'translateY(-150vh) rotate(-45deg) scale(0.2)';
   dartPin.style.opacity = '0';
   
-  // Emit event to Node.js backend
-  socket.emit('mobile-throw', {
-    intensity: parseFloat(intensity.toFixed(2))
+  // Sync with unified SyncHelper layer
+  SyncHelper.throwDart(parseFloat(intensity.toFixed(2)), (data) => {
+    handleThrowResult(data);
   });
   
   // Visual power confirmation
@@ -219,24 +219,8 @@ resultConfirmBtn.addEventListener('click', () => {
   resetDartVisuals();
 });
 
-// Socket Event listeners
-socket.on('connect', () => {
-  console.log("Mobile socket connected");
-  socket.emit('join-mobile');
-  
-  // Set badge to connected state
-  connectionBadge.className = 'connection-badge';
-  badgeText.innerText = '다트 연결됨';
-});
-
-socket.on('disconnect', () => {
-  console.log("Mobile socket disconnected");
-  connectionBadge.className = 'connection-badge disconnected';
-  badgeText.innerText = '연결 차단됨';
-});
-
-// Receive result from backend throw request
-socket.on('throw-result', (data) => {
+// Receive result from backend or Firebase throw request
+function handleThrowResult(data) {
   const resultTitle = document.getElementById('result-title');
   const resultDesc = document.getElementById('result-desc');
   
@@ -264,13 +248,48 @@ socket.on('throw-result', (data) => {
     alert(data.message || "오류가 발생했습니다!");
     resetDartVisuals();
   }
-});
+}
 
-// Reset command from host resets mobile too
-socket.on('board-reset', () => {
-  resultOverlay.classList.remove('active');
-  resetDartVisuals();
-});
+// --- Account Selection Overlay Routing ---
+const urlParams = new URLSearchParams(window.location.search);
+let accountId = urlParams.get('account');
+let room = urlParams.get('room') || getOrGenerateRoomId();
+
+const accountOverlay = document.getElementById('account-select-overlay');
+
+if (!accountId) {
+  // Show stunning glass selector overlay
+  accountOverlay.style.display = 'flex';
+  
+  document.querySelectorAll('.account-card-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const selectedAcc = btn.getAttribute('data-account');
+      window.location.search = `?room=${room}&account=${selectedAcc}`;
+    });
+  });
+} else {
+  // Dismiss selector
+  accountOverlay.style.display = 'none';
+  
+  // Set badge connection loading state
+  connectionBadge.className = 'connection-badge disconnected';
+  badgeText.innerText = '연결 시도 중...';
+  
+  // Initialize Unified Sync Layer!
+  SyncHelper.init({
+    role: 'mobile',
+    accountId: accountId,
+    onInit: () => {
+      connectionBadge.className = 'connection-badge';
+      badgeText.innerText = `연결됨 (계정 ${accountId})`;
+      console.log(`Mobile SyncHelper successfully established connection for Account ${accountId}`);
+    },
+    onReset: () => {
+      resultOverlay.classList.remove('active');
+      resetDartVisuals();
+    }
+  });
+}
 
 // Check hardware triggers on load
 checkMotionSensors();

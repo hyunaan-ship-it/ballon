@@ -71,28 +71,45 @@ const defaultPrizes = [
   "꽝 (아쉬워요!)", "스타벅스 커피", "꽝 (아쉬워요!)", "꽝 (아쉬워요!)", "대박! 에어팟 프로"
 ];
 
-let gameState = {
-  prizes: [...defaultPrizes],
-  popped: Array(25).fill(false)
+let accountsState = {
+  "1": { prizes: [...defaultPrizes], popped: Array(25).fill(false) },
+  "2": { prizes: [...defaultPrizes], popped: Array(25).fill(false) },
+  "3": { prizes: [...defaultPrizes], popped: Array(25).fill(false) },
+  "4": { prizes: [...defaultPrizes], popped: Array(25).fill(false) }
 };
 
 // Load existing data if available
 if (fs.existsSync(DATA_FILE)) {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    gameState.prizes = data.prizes || [...defaultPrizes];
-    gameState.popped = data.popped || Array(25).fill(false);
-    console.log("Game state successfully loaded from data.json");
+    // Auto-convert legacy single-account data if detected
+    if (data.prizes && data.popped) {
+      accountsState["1"] = {
+        prizes: data.prizes,
+        popped: data.popped
+      };
+      console.log("Legacy game state successfully migrated to Account 1");
+    } else {
+      for (const id of ["1", "2", "3", "4"]) {
+        if (data[id]) {
+          accountsState[id] = {
+            prizes: data[id].prizes || [...defaultPrizes],
+            popped: data[id].popped || Array(25).fill(false)
+          };
+        }
+      }
+      console.log("Game states for all accounts successfully loaded from data.json");
+    }
   } catch (err) {
     console.error("Error loading data.json, using defaults:", err);
   }
-} else {
-  saveGameState();
 }
+
+saveGameState();
 
 function saveGameState() {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(gameState, null, 2), 'utf8');
+    fs.writeFileSync(DATA_FILE, JSON.stringify(accountsState, null, 2), 'utf8');
   } catch (err) {
     console.error("Error saving game state:", err);
   }
@@ -117,103 +134,142 @@ app.use(express.static(path.join(__dirname, 'public')));
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
-  // Send initial data to any newly connected client
-  socket.emit('init-state', {
-    popped: gameState.popped,
-    prizes: gameState.prizes,
-    mobileUrl: MOBILE_URL,
-    localIp: LOCAL_IP
-  });
-
   // Host registers
-  socket.on('join-host', () => {
-    socket.join('host-room');
-    console.log(`Host joined: ${socket.id}`);
+  socket.on('join-host', (data = {}) => {
+    const accountId = String(data.accountId || '1');
+    socket.join(`host-room-${accountId}`);
+    socket.accountId = accountId;
+    console.log(`Host joined Account ${accountId}: ${socket.id}`);
+
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false) };
+    socket.emit('init-state', {
+      popped: state.popped,
+      prizes: state.prizes,
+      mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
+      localIp: LOCAL_IP
+    });
   });
 
   // Mobile registers
-  socket.on('join-mobile', () => {
-    socket.join('mobile-room');
-    console.log(`Mobile controller joined: ${socket.id}`);
-    io.to('host-room').emit('mobile-connected', { count: io.sockets.adapter.rooms.get('mobile-room')?.size || 0 });
+  socket.on('join-mobile', (data = {}) => {
+    const accountId = String(data.accountId || '1');
+    socket.join(`mobile-room-${accountId}`);
+    socket.accountId = accountId;
+    console.log(`Mobile controller joined Account ${accountId}: ${socket.id}`);
+
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false) };
+    socket.emit('init-state', {
+      popped: state.popped,
+      prizes: state.prizes,
+      mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
+      localIp: LOCAL_IP
+    });
+
+    const activeMobiles = io.sockets.adapter.rooms.get(`mobile-room-${accountId}`)?.size || 0;
+    io.to(`host-room-${accountId}`).emit('mobile-connected', { count: activeMobiles });
+  });
+
+  // Admin registers
+  socket.on('join-admin', (data = {}) => {
+    const accountId = String(data.accountId || '1');
+    socket.join(`admin-room-${accountId}`);
+    socket.accountId = accountId;
+    console.log(`Admin joined Account ${accountId}: ${socket.id}`);
+
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false) };
+    socket.emit('init-state', {
+      popped: state.popped,
+      prizes: state.prizes,
+      mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
+      localIp: LOCAL_IP
+    });
   });
 
   socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.id}`);
-    io.to('host-room').emit('mobile-disconnected', { count: io.sockets.adapter.rooms.get('mobile-room')?.size || 0 });
+    const accountId = socket.accountId;
+    console.log(`Socket disconnected: ${socket.id} (Account: ${accountId})`);
+    if (accountId) {
+      const activeMobiles = io.sockets.adapter.rooms.get(`mobile-room-${accountId}`)?.size || 0;
+      io.to(`host-room-${accountId}`).emit('mobile-disconnected', { count: activeMobiles });
+    }
   });
 
   // Admin saves updated prizes
   socket.on('admin-update-prizes', (updatedPrizes) => {
-    if (Array.isArray(updatedPrizes) && updatedPrizes.length === 25) {
-      gameState.prizes = updatedPrizes;
+    const accountId = socket.accountId || '1';
+    const state = accountsState[accountId];
+    if (state && Array.isArray(updatedPrizes) && updatedPrizes.length === 25) {
+      state.prizes = updatedPrizes;
       saveGameState();
-      io.emit('state-updated', { prizes: gameState.prizes, popped: gameState.popped });
-      console.log("Prizes updated by Admin");
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+      console.log(`Prizes updated by Admin for Account ${accountId}`);
     }
   });
 
   // Admin resets the board
   socket.on('admin-reset-board', (options = {}) => {
-    gameState.popped = Array(25).fill(false);
-    if (options.shuffle) {
-      // Shuffle the prizes
-      for (let i = gameState.prizes.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [gameState.prizes[i], gameState.prizes[j]] = [gameState.prizes[j], gameState.prizes[i]];
+    const accountId = socket.accountId || '1';
+    const state = accountsState[accountId];
+    if (state) {
+      state.popped = Array(25).fill(false);
+      if (options.shuffle) {
+        // Shuffle the prizes
+        for (let i = state.prizes.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [state.prizes[i], state.prizes[j]] = [state.prizes[j], state.prizes[i]];
+        }
+        console.log(`Board reset and prizes shuffled for Account ${accountId}`);
+      } else {
+        console.log(`Board reset (prizes maintained) for Account ${accountId}`);
       }
-      console.log("Board reset and prizes shuffled");
-    } else {
-      console.log("Board reset (prizes maintained)");
+      saveGameState();
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+      io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
     }
-    saveGameState();
-    io.emit('state-updated', { prizes: gameState.prizes, popped: gameState.popped });
-    io.emit('board-reset');
   });
 
-  // Admin toggles balloon pop state directly (allows single unpop)
+  // Admin toggles balloon pop state directly
   socket.on('admin-toggle-pop', (index) => {
-    if (index >= 0 && index < 25) {
-      gameState.popped[index] = !gameState.popped[index];
+    const accountId = socket.accountId || '1';
+    const state = accountsState[accountId];
+    if (state && index >= 0 && index < 25) {
+      state.popped[index] = !state.popped[index];
       saveGameState();
-      io.emit('state-updated', { prizes: gameState.prizes, popped: gameState.popped });
-      console.log(`Admin toggled popped state of index ${index} to ${gameState.popped[index]}`);
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+      console.log(`Admin toggled popped state of index ${index} to ${state.popped[index]} for Account ${accountId}`);
     }
   });
 
   // Mobile player triggers a throw
   socket.on('mobile-throw', (data) => {
-    console.log(`Dart thrown from mobile: ${socket.id} with intensity:`, data.intensity || 1);
+    const accountId = socket.accountId || '1';
+    const state = accountsState[accountId];
+    if (!state) return;
+
+    console.log(`Dart thrown from mobile: ${socket.id} on Account ${accountId} with intensity:`, data.intensity || 1);
 
     // Find unpopped balloons
     const unpoppedIndices = [];
-    for (let i = 0; i < gameState.popped.length; i++) {
-      if (!gameState.popped[i]) {
+    for (let i = 0; i < state.popped.length; i++) {
+      if (!state.popped[i]) {
         unpoppedIndices.push(i);
       }
     }
 
     if (unpoppedIndices.length === 0) {
-      // All popped
       socket.emit('throw-result', { status: 'error', message: '모든 풍선이 이미 터졌습니다!' });
       return;
     }
 
-    // Determine if it is a miss:
-    // If throw intensity is too low (< 0.6) or random 15% chance
+    // Determine if it is a miss
     const isMiss = (data.intensity < 0.6) || (Math.random() < 0.15);
 
     if (isMiss) {
-      // Choose which balloon to fly towards (for a visual miss target)
       const randomIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
-      
-      // Broadcast to host (to trigger miss flight animation)
-      io.to('host-room').emit('balloon-miss-trigger', {
+      io.to(`host-room-${accountId}`).emit('balloon-miss-trigger', {
         index: randomIndex,
         intensity: data.intensity || 1
       });
-
-      // Send back miss status to the mobile client
       socket.emit('throw-result', {
         status: 'miss',
         index: randomIndex
@@ -223,44 +279,46 @@ io.on('connection', (socket) => {
 
     // Pick a random unpopped balloon (Hit Success!)
     const randomIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
-    gameState.popped[randomIndex] = true;
+    state.popped[randomIndex] = true;
     saveGameState();
 
     const result = {
       index: randomIndex,
-      prize: gameState.prizes[randomIndex],
+      prize: state.prizes[randomIndex],
       intensity: data.intensity || 1
     };
 
     // Broadcast to host (to trigger animation and show result)
-    io.to('host-room').emit('balloon-pop-trigger', result);
+    io.to(`host-room-${accountId}`).emit('balloon-pop-trigger', result);
 
     // Send back success to the mobile client
     socket.emit('throw-result', {
       status: 'success',
       index: randomIndex,
-      prize: gameState.prizes[randomIndex]
+      prize: state.prizes[randomIndex]
     });
 
-    // Sync state to all clients (including Admin)
-    io.emit('state-updated', { prizes: gameState.prizes, popped: gameState.popped });
+    // Sync state to all clients in this account
+    io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
   });
 
   // Direct pop from Host (click balloon directly as fallback)
   socket.on('host-direct-pop', (index) => {
-    if (index >= 0 && index < 25 && !gameState.popped[index]) {
-      gameState.popped[index] = true;
+    const accountId = socket.accountId || '1';
+    const state = accountsState[accountId];
+    if (state && index >= 0 && index < 25 && !state.popped[index]) {
+      state.popped[index] = true;
       saveGameState();
 
       const result = {
         index: index,
-        prize: gameState.prizes[index],
+        prize: state.prizes[index],
         intensity: 1.0
       };
 
-      io.to('host-room').emit('balloon-pop-trigger', result);
-      io.emit('state-updated', { prizes: gameState.prizes, popped: gameState.popped });
-      console.log(`Direct pop from host: index ${index}`);
+      io.to(`host-room-${accountId}`).emit('balloon-pop-trigger', result);
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+      console.log(`Direct pop from host: index ${index} on Account ${accountId}`);
     }
   });
 });
@@ -270,7 +328,7 @@ server.listen(PORT, () => {
   console.log("🎈 BALLOON POPPING GAME SERVER RUNNING 🎈");
   console.log(`- Local Host Screen: http://localhost:${PORT}`);
   console.log(`- Admin Screen:      http://localhost:${PORT}/admin.html`);
-  console.log(`- Mobile Controller:  ${MOBILE_URL}`);
+  console.log(`- Mobile Controller:  http://${LOCAL_IP}:${PORT}/mobile.html`);
   console.log("==================================================");
   console.log("Connect your mobile device to the same Wi-Fi and open the Mobile Controller URL.");
 });
