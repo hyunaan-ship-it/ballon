@@ -767,13 +767,24 @@ window.addEventListener('sync-fallback-active', (e) => {
   alertBanner.style.lineHeight = '1.5';
   alertBanner.style.boxShadow = '0 20px 40px rgba(0,0,0,0.6)';
   
+  const isSupabase = e.detail.targetMode === 'supabase';
+  const title = isSupabase ? '⚠️ Supabase 연동 실패 (오프라인 모드 실행)' : '⚠️ Firebase 연동 실패 (오프라인 모드 실행)';
+  const targetUrl = isSupabase ? e.detail.supabaseURL : e.detail.databaseURL;
+  
+  const explanation = isSupabase ? `
+    설정된 Supabase 실시간 브로드캐스트 채널(<code>${targetUrl}</code>) 연결이 방화벽에 차단되었거나 API 키가 유효하지 않아 <strong>로컬 오프라인 모드</strong>로 전환되었습니다.<br><br>
+    이 화면에서 풍선 터트리기 시뮬레이션은 정상 플레이 가능하지만, 모바일 연동 기능을 사용하려면 <strong>public/js/firebase-config.js</strong>에 본인의 실제 Supabase <code>url</code>과 <code>anonKey</code>를 적용해 주세요.
+  ` : `
+    설정된 Firebase 실시간 데이터베이스(<code>${targetUrl}</code>) 연결이 방화벽에 차단되었거나 유효하지 않아 <strong>로컬 오프라인 모드</strong>로 전환되었습니다.<br><br>
+    이 화면에서 풍선 터트리기 시뮬레이션은 정상 플레이 가능하지만, 모바일 연동 기능을 사용하려면 <strong>public/js/firebase-config.js</strong>에 본인의 실제 Firebase <code>databaseURL</code>을 적용해 주세요.
+  `;
+
   alertBanner.innerHTML = `
     <div style="font-weight: 800; font-size: 0.98rem; color: #ffc107; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-      ⚠️ Firebase 연동 실패 (오프라인 모드 실행)
+      ${title}
     </div>
     <div>
-      설정된 Firebase 실시간 데이터베이스(<code>${e.detail.databaseURL}</code>) 연결이 방화벽에 차단되었거나 유효하지 않아 <strong>로컬 오프라인 모드</strong>로 전환되었습니다.<br><br>
-      이 화면에서 풍선 터트리기 시뮬레이션은 정상 플레이 가능하지만, 모바일 연동 기능을 사용하려면 <strong>public/js/firebase-config.js</strong>에 본인의 실제 Firebase <code>databaseURL</code>을 적용해 주세요.
+      ${explanation}
     </div>
     <button onclick="this.parentElement.remove()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #aaa; cursor: pointer; font-weight: bold; font-size: 1.1rem; transition: color 0.2s;">×</button>
   `;

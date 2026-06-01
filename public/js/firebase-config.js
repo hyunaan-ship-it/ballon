@@ -1,17 +1,23 @@
-// Firebase Configuration and Sync Settings
-// This file controls whether the game runs in Local Node.js (Socket.io) mode or Vercel Serverless (Firebase) mode.
+// Config and Synchronization Settings
+// Controls whether the game runs in Local Node.js (Socket.io) mode, Serverless Firebase mode, or Serverless Supabase Realtime mode!
 
 const SYNC_CONFIG = {
-  // Sync mode: 'socket' or 'firebase'
+  // Sync mode: 'socket', 'firebase', or 'supabase'
   // - 'socket': Uses your local Express Node.js server + Socket.io (best for local network testing)
-  // - 'firebase': Uses serverless Firebase Realtime Database (best for deploying to Vercel with ZERO cold start times!)
-  mode: (window.location.hostname.includes('vercel.app') || window.location.href.includes('mode=firebase')) ? 'firebase' : 'socket', 
+  // - 'firebase': Uses serverless Firebase Realtime Database
+  // - 'supabase': Uses serverless Supabase Realtime Broadcast (extreme low-latency, free, and zero SQL tables setup needed!)
+  mode: (window.location.hostname.includes('vercel.app') || window.location.href.includes('mode=supabase')) ? 'supabase' : 'socket', 
 
-  // Firebase Realtime Database configuration (used when mode is 'firebase')
-  // We provide a pre-configured public database so it works out-of-the-box!
-  // If you want to use your own Firebase database, replace these credentials with yours.
+  // Firebase configuration (used when mode is 'firebase')
   firebase: {
     databaseURL: "https://balloon-game-rtdb-default-rtdb.asia-southeast1.firebasedatabase.app"
+  },
+
+  // Supabase Realtime configuration (used when mode is 'supabase')
+  // Simply create a free Supabase project, copy your URL and Anon Key here, and it will work instantly with ZERO SQL database tables setup!
+  supabase: {
+    url: "https://your-supabase-project.supabase.co",
+    anonKey: "your-supabase-anon-key"
   }
 };
 
