@@ -16,8 +16,8 @@ const SYNC_CONFIG = {
   // Supabase Realtime configuration (used when mode is 'supabase')
   // Simply create a free Supabase project, copy your URL and Anon Key here, and it will work instantly with ZERO SQL database tables setup!
   supabase: {
-    url: "https://your-supabase-project.supabase.co",
-    anonKey: "your-supabase-anon-key"
+    url: "https://dmmgkrtxszjogdjhdwde.supabase.co",
+    anonKey: "sb_publishable_kfpjWCVFzozRMGCIo1tPxg_59HRk81F"
   }
 };
 
