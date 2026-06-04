@@ -79,6 +79,10 @@ let accountsState = {
   "4": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) }
 };
 
+// Cooldown to prevent duplicate throw triggers on the server side
+const lastAccountThrowTime = {};
+const SERVER_THROW_COOLDOWN = 1800; // 1.8 seconds minimum between throws per account
+
 // Winners data structure
 let winnersData = {
   "1": [],
@@ -273,15 +277,24 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Admin updates require winner info settings
-  socket.on('admin-update-require-winner-info', (requireWinnerInfo) => {
+  // Admin updates both prizes and settings at the same time
+  socket.on('admin-update-prizes-and-settings', (data) => {
     const accountId = socket.accountId || '1';
     const state = accountsState[accountId];
-    if (state && Array.isArray(requireWinnerInfo) && requireWinnerInfo.length === 25) {
-      state.requireWinnerInfo = requireWinnerInfo;
+    if (state && data) {
+      if (Array.isArray(data.prizes) && data.prizes.length === 25) {
+        state.prizes = data.prizes;
+      }
+      if (Array.isArray(data.requireWinnerInfo) && data.requireWinnerInfo.length === 25) {
+        state.requireWinnerInfo = data.requireWinnerInfo;
+      }
       saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
-      console.log(`Require winner info updated by Admin for Account ${accountId}`);
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { 
+        prizes: state.prizes, 
+        popped: state.popped, 
+        requireWinnerInfo: state.requireWinnerInfo 
+      });
+      console.log(`Prizes and requireWinnerInfo updated by Admin for Account ${accountId}`);
     }
   });
 
@@ -324,6 +337,15 @@ io.on('connection', (socket) => {
     const accountId = socket.accountId || '1';
     const state = accountsState[accountId];
     if (!state) return;
+
+    // Server-side duplicate throw mitigation
+    const now = Date.now();
+    const lastThrow = lastAccountThrowTime[accountId] || 0;
+    if (now - lastThrow < SERVER_THROW_COOLDOWN) {
+      console.log(`[Server] Blocked duplicate throw request for Account ${accountId}. Time diff: ${now - lastThrow}ms`);
+      return;
+    }
+    lastAccountThrowTime[accountId] = now;
 
     console.log(`Dart thrown from mobile: ${socket.id} on Account ${accountId} with intensity:`, data.intensity || 1, 'tilt:', data.tilt);
 

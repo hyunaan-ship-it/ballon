@@ -13,7 +13,7 @@ const opResetBtn = document.getElementById('op-reset');
 const opShuffleBtn = document.getElementById('op-shuffle');
 const downloadCsvBtn = document.getElementById('download-csv-btn');
 const winnersCountDiv = document.getElementById('winners-count');
-const saveWinnerInfoSettingsBtn = document.getElementById('save-winner-info-settings-btn');
+const toggleAllWinnerInfo = document.getElementById('toggle-all-winner-info');
 
 // Quick Presets
 const presetBalancedBtn = document.getElementById('preset-balanced');
@@ -116,6 +116,11 @@ function syncUIWithData() {
       }
     }
   }
+  
+  if (toggleAllWinnerInfo) {
+    const allChecked = currentRequireWinnerInfo.length === 25 && currentRequireWinnerInfo.every(val => val === true);
+    toggleAllWinnerInfo.checked = allChecked;
+  }
 }
 
 // Preset Generators
@@ -174,7 +179,7 @@ presetBlankBtn.addEventListener('click', () => {
   }
 });
 
-// Save all prizes
+// Save all prizes and settings
 saveBtn.addEventListener('click', (e) => {
   e.preventDefault();
   
@@ -194,9 +199,15 @@ saveBtn.addEventListener('click', (e) => {
       return;
     }
   }
+
+  const requireWinnerInfo = [];
+  for (let i = 0; i < 25; i++) {
+    const checkbox = document.getElementById(`require-winner-info-${i}`);
+    requireWinnerInfo.push(checkbox ? checkbox.checked : false);
+  }
   
-  SyncHelper.updatePrizes(updatedPrizes);
-  alert("🎉 경품 수정사항이 성공적으로 저장 및 live 동기화되었습니다!");
+  SyncHelper.updatePrizesAndSettings(updatedPrizes, requireWinnerInfo);
+  alert("🎉 경품 및 설정이 성공적으로 저장 및 live 동기화되었습니다!");
 });
 
 // Reset and Shuffle operations
@@ -214,39 +225,16 @@ opShuffleBtn.addEventListener('click', () => {
   }
 });
 
-// Bulk check/uncheck winner info checkboxes
-const checkAllWinnerInfoBtn = document.getElementById('check-all-winner-info-btn');
-const uncheckAllWinnerInfoBtn = document.getElementById('uncheck-all-winner-info-btn');
-
-if (checkAllWinnerInfoBtn) {
-  checkAllWinnerInfoBtn.addEventListener('click', () => {
+// Master checkbox toggle for requireWinnerInfo
+if (toggleAllWinnerInfo) {
+  toggleAllWinnerInfo.addEventListener('change', (e) => {
+    const checked = e.target.checked;
     for (let i = 0; i < 25; i++) {
       const checkbox = document.getElementById(`require-winner-info-${i}`);
-      if (checkbox) checkbox.checked = true;
+      if (checkbox) checkbox.checked = checked;
     }
   });
 }
-
-if (uncheckAllWinnerInfoBtn) {
-  uncheckAllWinnerInfoBtn.addEventListener('click', () => {
-    for (let i = 0; i < 25; i++) {
-      const checkbox = document.getElementById(`require-winner-info-${i}`);
-      if (checkbox) checkbox.checked = false;
-    }
-  });
-}
-
-// Save winner info settings
-saveWinnerInfoSettingsBtn.addEventListener('click', () => {
-  const requireWinnerInfo = [];
-  for (let i = 0; i < 25; i++) {
-    const checkbox = document.getElementById(`require-winner-info-${i}`);
-    requireWinnerInfo.push(checkbox ? checkbox.checked : false);
-  }
-  
-  SyncHelper.updateRequireWinnerInfo(requireWinnerInfo);
-  alert("당첨자 정보 입력 설정이 저장되었습니다!");
-});
 
 // Download CSV functionality
 downloadCsvBtn.addEventListener('click', () => {

@@ -70,19 +70,14 @@
         </form>
 
         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 10px;">
-          <div style="display: flex; gap: 8px; width: 100%;">
-            <button id="check-all-winner-info-btn" type="button" class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.8rem; background: rgba(0, 242, 254, 0.05); border-color: rgba(0, 242, 254, 0.2);">
-              ☑️ 일괄 체크
-            </button>
-            <button id="uncheck-all-winner-info-btn" type="button" class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.8rem; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15);">
-              ⬛ 일괄 해제
-            </button>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;">
+            <input type="checkbox" id="toggle-all-winner-info" style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="toggle-all-winner-info" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+              🎯 당첨자 정보 입력 전체 선택 / 해제
+            </label>
           </div>
-          <button id="save-winner-info-settings-btn" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem;">
-            💾 당첨자 정보 입력 설정 저장
-          </button>
           <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">
-            체크박스로 당첨자 정보 입력 필요 여부를 설정하세요.
+            각 풍선 아래 체크박스로 당첨자 정보 입력 필요 여부를 설정하고, 오른쪽 '저장 & 동기화' 버튼을 눌러 저장하세요.
           </div>
         </div>
       </section>
@@ -94,7 +89,7 @@
         <div class="toolkit-card glass-panel">
           <h3 class="toolkit-title">게임 동기화</h3>
           <button id="save-prizes-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 1rem;">
-            💾 경품 내용 저장 & 동기화
+            💾 경품 및 설정 저장 & 동기화
           </button>
           <div class="alert-box">
             경품 저장 시 메인 풍선판 및 연결된 모바일에 <strong>실시간으로 동기화</strong>되며, 서버 파일에 영구 저장됩니다.

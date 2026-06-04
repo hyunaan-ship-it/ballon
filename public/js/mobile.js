@@ -68,6 +68,9 @@ function triggerThrow(intensity = 1.0) {
   lastThrowTime = now;
   canThrow = false;
   
+  // Disable all pointer interactions on the screen to prevent double throws
+  document.body.style.pointerEvents = 'none';
+  
   // Haptic feedback on launch
   triggerHaptic('throw');
   
@@ -100,6 +103,9 @@ function resetDartVisuals() {
   dartPin.style.opacity = '1';
   
   updatePowerBar(0);
+  
+  // Re-enable pointer interactions
+  document.body.style.pointerEvents = 'auto';
   canThrow = true;
 }
 
@@ -310,6 +316,9 @@ submitWinnerBtn.addEventListener('click', () => {
 function handleThrowResult(data) {
   const resultTitle = document.getElementById('result-title');
   const resultDesc = document.getElementById('result-desc');
+  
+  // Re-enable pointer interactions when response arrives
+  document.body.style.pointerEvents = 'auto';
   
   if (data.status === 'success') {
     triggerHaptic('hit');

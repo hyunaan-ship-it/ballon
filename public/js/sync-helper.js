@@ -500,6 +500,15 @@ class BalloonSyncHelper {
     let state = JSON.parse(localStorage.getItem(localKey));
     if (!state) return;
 
+    // Supabase duplicate throw mitigation
+    const now = Date.now();
+    if (!this.lastSupabaseThrowTime) this.lastSupabaseThrowTime = 0;
+    if (now - this.lastSupabaseThrowTime < 1800) {
+      console.log(`[Supabase] Blocked duplicate throw request. Time diff: ${now - this.lastSupabaseThrowTime}ms`);
+      return;
+    }
+    this.lastSupabaseThrowTime = now;
+
     const unpoppedIndices = [];
     for (let i = 0; i < state.popped.length; i++) {
       if (!state.popped[i]) unpoppedIndices.push(i);
@@ -651,6 +660,15 @@ class BalloonSyncHelper {
     accountRef.child('state').once('value', (snapshot) => {
       const state = snapshot.val();
       if (!state) return;
+
+      // Firebase duplicate throw mitigation
+      const now = Date.now();
+      if (!this.lastFirebaseThrowTime) this.lastFirebaseThrowTime = 0;
+      if (now - this.lastFirebaseThrowTime < 1800) {
+        console.log(`[Firebase] Blocked duplicate throw request.`);
+        return;
+      }
+      this.lastFirebaseThrowTime = now;
 
       const unpoppedIndices = [];
       for (let i = 0; i < state.popped.length; i++) {
@@ -891,6 +909,38 @@ class BalloonSyncHelper {
         const state = snapshot.val();
         if (state) {
           state.prizes = updatedPrizes;
+          stateRef.set(state);
+        }
+      });
+    }
+  }
+
+  updatePrizesAndSettings(updatedPrizes, requireWinnerInfo) {
+    if (this.mode === 'socket') {
+      this.socket.emit('admin-update-prizes-and-settings', { prizes: updatedPrizes, requireWinnerInfo: requireWinnerInfo });
+    } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
+      const localKey = `balloon_state_acc_${this.accountId}`;
+      let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [], requireWinnerInfo: [] };
+      state.prizes = updatedPrizes;
+      state.requireWinnerInfo = requireWinnerInfo;
+      localStorage.setItem(localKey, JSON.stringify(state));
+      
+      if (this.mode === 'supabase') {
+        this.channel.send({
+          type: 'broadcast',
+          event: 'state-updated',
+          payload: state
+        });
+      } else {
+        if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
+      }
+    } else {
+      const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/state`);
+      stateRef.once('value', (snapshot) => {
+        const state = snapshot.val();
+        if (state) {
+          state.prizes = updatedPrizes;
+          state.requireWinnerInfo = requireWinnerInfo;
           stateRef.set(state);
         }
       });
