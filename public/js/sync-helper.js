@@ -33,7 +33,7 @@ class BalloonSyncHelper {
     this._winnersStoreLoaded = false;
   }
 
-  init({ role, accountId, onInit, onStateUpdate, onReset, onPopTrigger, onMissTrigger, onMobileCount, onPrizeConfirmed, onNewWinner }) {
+  init({ role, accountId, onInit, onStateUpdate, onReset, onPopTrigger, onMissTrigger, onMobileCount, onPrizeConfirmed, onNewWinner, onWinnersCleared }) {
     this.role = role;
     this.accountId = String(accountId || '1');
     this.room = getOrGenerateRoomId();
@@ -45,6 +45,7 @@ class BalloonSyncHelper {
     this.onMobileCountCallback = onMobileCount;
     this.onPrizeConfirmedCallback = onPrizeConfirmed;
     this.onNewWinnerCallback = onNewWinner;
+    this.onWinnersClearedCallback = onWinnersCleared || null;
 
     console.log(`[SyncHelper] Initializing in ${this.mode.toUpperCase()} mode for Account ${this.accountId}, Room ${this.room}`);
 
@@ -134,6 +135,15 @@ class BalloonSyncHelper {
       this.socket.on('new-winner', (winnerInfo) => {
         if (this.onNewWinnerCallback) {
           this.onNewWinnerCallback(winnerInfo);
+        }
+      });
+
+      this.socket.on('winners-cleared', () => {
+        // Clear in-memory store when server broadcasts that winners were cleared
+        this._winnersStore = [];
+        this._winnersStoreLoaded = true;
+        if (this.onWinnersClearedCallback) {
+          this.onWinnersClearedCallback();
         }
       });
     } catch (e) {
@@ -1073,12 +1083,13 @@ class BalloonSyncHelper {
   }
 
   submitWinnerInfo(employeeId, phoneNumber, prize, onResult) {
+    const now = new Date();
     const winnerInfo = {
       employeeId,
       phoneNumber,
       prize,
-      timestamp: new Date().toISOString(),
-      timestampFormatted: new Date().toLocaleString('ko-KR')
+      timestamp: now.toISOString(),
+      timestampFormatted: now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
     };
 
     if (this.mode === 'socket') {
@@ -1263,6 +1274,42 @@ class BalloonSyncHelper {
       });
     }
   }
+  clearWinners(callback) {
+    if (this.mode === 'socket' || this.mode === 'supabase' || this.mode === 'local-fallback') {
+      // HTTP DELETE to server API
+      fetch(`/api/winners/${this.accountId}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+          // Also clear in-memory store
+          this._winnersStore = [];
+          this._winnersStoreLoaded = true;
+          // Clear localStorage backup
+          const localKey = `winners_list_acc_${this.accountId}`;
+          localStorage.removeItem(localKey);
+          callback({ status: 'success' });
+        })
+        .catch(err => {
+          console.warn('[SyncHelper] clearWinners HTTP failed:', err);
+          // Still clear local stores even if server fails
+          this._winnersStore = [];
+          const localKey = `winners_list_acc_${this.accountId}`;
+          localStorage.removeItem(localKey);
+          callback({ status: 'error', message: err.message });
+        });
+    } else if (this.mode === 'firebase') {
+      const winnersRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/winners`);
+      winnersRef.remove()
+        .then(() => callback({ status: 'success' }))
+        .catch(err => callback({ status: 'error', message: err.message }));
+    } else {
+      // Fallback: only clear local
+      this._winnersStore = [];
+      const localKey = `winners_list_acc_${this.accountId}`;
+      localStorage.removeItem(localKey);
+      callback({ status: 'success' });
+    }
+  }
+
 }
 
 const SyncHelper = new BalloonSyncHelper();

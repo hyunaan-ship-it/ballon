@@ -300,12 +300,23 @@ submitWinnerBtn.addEventListener('click', () => {
     return;
   }
   
+  // Disable button to prevent double submit
+  submitWinnerBtn.disabled = true;
+  submitWinnerBtn.innerText = '제출 중...';
+  
   SyncHelper.submitWinnerInfo(employeeId, phoneNumber, currentPrize, (response) => {
+    submitWinnerBtn.disabled = false;
+    submitWinnerBtn.innerText = '정보 제출하기';
     if (response.status === 'success') {
-      alert('당첨 정보가 제출되었습니다!');
+      // 입력 폼 초기화
       winnerInfoForm.style.display = 'none';
       employeeIdInput.value = '';
       phoneNumberInput.value = '';
+      // 컴퓨터 화면도 다음 단계로 전환 (prize-confirmed 브로드캐스트)
+      SyncHelper.confirmPrizeClaim();
+      // 핸드폰 오버레이 닫고 다트 재세팅
+      resultOverlay.classList.remove('active');
+      resetDartVisuals();
     } else {
       alert(response.message || '제출 중 오류가 발생했습니다.');
     }

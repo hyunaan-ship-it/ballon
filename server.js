@@ -181,12 +181,15 @@ app.post('/api/winners/:accountId', (req, res) => {
     return res.status(400).json({ status: 'error', message: '모든 필드를 입력해주세요.' });
   }
 
+  const now = new Date();
+  const kstFormatted = now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
   const winnerInfo = {
     employeeId,
     phoneNumber,
     prize,
-    timestamp: new Date().toISOString(),
-    timestampFormatted: new Date().toLocaleString('ko-KR')
+    timestamp: now.toISOString(),
+    timestampFormatted: kstFormatted
   };
 
   if (!winnersData[accountId]) {
@@ -202,6 +205,21 @@ app.post('/api/winners/:accountId', (req, res) => {
   
   res.json({ status: 'success' });
 });
+
+// API endpoint to delete (clear) all winners for an account
+app.delete('/api/winners/:accountId', (req, res) => {
+  const accountId = req.params.accountId || '1';
+  if (!winnersData[accountId]) {
+    winnersData[accountId] = [];
+  }
+  winnersData[accountId] = [];
+  saveWinnersData();
+  console.log(`Winners data cleared for Account ${accountId}`);
+  // Notify admin room
+  io.to(`admin-room-${accountId}`).emit('winners-cleared');
+  res.json({ status: 'success', message: '당첨자 기록이 삭제되었습니다.' });
+});
+
 
 // API endpoint to get winners data
 app.get('/api/winners/:accountId', (req, res) => {
@@ -504,12 +522,13 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const now = new Date();
     const winnerInfo = {
       employeeId,
       phoneNumber,
       prize,
-      timestamp: new Date().toISOString(),
-      timestampFormatted: new Date().toLocaleString('ko-KR')
+      timestamp: now.toISOString(),
+      timestampFormatted: now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
     };
 
     winnersData[accountId].push(winnerInfo);

@@ -12,6 +12,7 @@ const saveBtn = document.getElementById('save-prizes-btn');
 const opResetBtn = document.getElementById('op-reset');
 const opShuffleBtn = document.getElementById('op-shuffle');
 const downloadCsvBtn = document.getElementById('download-csv-btn');
+const clearWinnersBtn = document.getElementById('clear-winners-btn');
 const winnersCountDiv = document.getElementById('winners-count');
 const toggleAllWinnerInfo = document.getElementById('toggle-all-winner-info');
 
@@ -281,6 +282,21 @@ downloadCsvBtn.addEventListener('click', () => {
   downloadWinnersCSV();
 });
 
+// Clear winners functionality
+if (clearWinnersBtn) {
+  clearWinnersBtn.addEventListener('click', () => {
+    if (!confirm('당첨자 기록을 전부 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!')) return;
+    SyncHelper.clearWinners((response) => {
+      if (response.status === 'success') {
+        winnersCountDiv.innerText = '당첨자: 0명';
+        alert('당첨자 기록이 전부 삭제되었습니다.');
+      } else {
+        alert(response.message || '삭제 중 오류가 발생했습니다.');
+      }
+    });
+  });
+}
+
 // Load winners count on init or date change
 function loadWinnersCount() {
   SyncHelper.getWinners((winners) => {
@@ -369,6 +385,9 @@ if (!accountId) {
     },
     onNewWinner: (winner) => {
       loadWinnersCount();
+    },
+    onWinnersCleared: () => {
+      winnersCountDiv.innerText = '당첨자: 0명';
     }
   });
 }
