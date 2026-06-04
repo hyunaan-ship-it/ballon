@@ -361,18 +361,19 @@ io.on('connection', (socket) => {
     if (data.tilt && (data.tilt.x !== undefined || data.tilt.y !== undefined)) {
       // Map tilt to 5x5 grid (0-24)
       // tilt.x: -1 to 1 (left to right), tilt.y: -1 to 1 (top to bottom)
-      const col = Math.floor(((data.tilt.x + 1) / 2) * 5);
-      const row = Math.floor(((data.tilt.y + 1) / 2) * 5);
-      const tiltedIndex = row * 5 + col;
+      const col = Math.max(0, Math.min(4, Math.floor(((data.tilt.x + 1) / 2) * 5)));
+      const row = Math.max(0, Math.min(4, Math.floor(((data.tilt.y + 1) / 2) * 5)));
       
-      // Find closest unpopped balloon to tilted position
+      // Find closest unpopped balloon using 2D distance
       let closestIndex = unpoppedIndices[0];
-      let minDistance = Math.abs(tiltedIndex - closestIndex);
+      let minDistanceSq = Infinity;
       
       for (const idx of unpoppedIndices) {
-        const distance = Math.abs(tiltedIndex - idx);
-        if (distance < minDistance) {
-          minDistance = distance;
+        const r = Math.floor(idx / 5);
+        const c = idx % 5;
+        const distSq = Math.pow(row - r, 2) + Math.pow(col - c, 2);
+        if (distSq < minDistanceSq) {
+          minDistanceSq = distSq;
           closestIndex = idx;
         }
       }
@@ -403,7 +404,7 @@ io.on('connection', (socket) => {
     });
 
     // Sync state to all clients in this account
-    io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+    io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
   });
 
   // Mobile/Host confirms prize claim (sync dismiss)

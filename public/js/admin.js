@@ -214,6 +214,28 @@ opShuffleBtn.addEventListener('click', () => {
   }
 });
 
+// Bulk check/uncheck winner info checkboxes
+const checkAllWinnerInfoBtn = document.getElementById('check-all-winner-info-btn');
+const uncheckAllWinnerInfoBtn = document.getElementById('uncheck-all-winner-info-btn');
+
+if (checkAllWinnerInfoBtn) {
+  checkAllWinnerInfoBtn.addEventListener('click', () => {
+    for (let i = 0; i < 25; i++) {
+      const checkbox = document.getElementById(`require-winner-info-${i}`);
+      if (checkbox) checkbox.checked = true;
+    }
+  });
+}
+
+if (uncheckAllWinnerInfoBtn) {
+  uncheckAllWinnerInfoBtn.addEventListener('click', () => {
+    for (let i = 0; i < 25; i++) {
+      const checkbox = document.getElementById(`require-winner-info-${i}`);
+      if (checkbox) checkbox.checked = false;
+    }
+  });
+}
+
 // Save winner info settings
 saveWinnerInfoSettingsBtn.addEventListener('click', () => {
   const requireWinnerInfo = [];

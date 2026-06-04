@@ -130,18 +130,60 @@ function handleDeviceMotion(event) {
   }
 }
 
-// Device orientation handling for tilt-based targeting
-function handleDeviceOrientation(event) {
-  if (!event.beta || !event.gamma) return;
+// Build aim grid dynamically on mobile screen
+const aimGrid = document.getElementById('aim-grid');
+if (aimGrid) {
+  for (let i = 0; i < 25; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'aim-cell';
+    cell.id = `aim-cell-${i}`;
+    aimGrid.appendChild(cell);
+  }
+}
+
+let mobilePoppedState = Array(25).fill(false);
+
+function updateAimVisualizer() {
+  const col = Math.max(0, Math.min(4, Math.floor(((deviceTilt.x + 1) / 2) * 5)));
+  const row = Math.max(0, Math.min(4, Math.floor(((deviceTilt.y + 1) / 2) * 5)));
+  const tiltedIndex = row * 5 + col;
   
+  for (let i = 0; i < 25; i++) {
+    const cell = document.getElementById(`aim-cell-${i}`);
+    if (cell) {
+      cell.className = 'aim-cell';
+      if (mobilePoppedState[i]) {
+        cell.classList.add('popped');
+      }
+      if (i === tiltedIndex) {
+        cell.classList.add('target');
+      }
+    }
+  }
+}
+
+// Device orientation handling for tilt-based targeting (calibrated for natural phone hold)
+function handleDeviceOrientation(event) {
   // beta: front-to-back tilt (-180 to 180), gamma: left-to-right tilt (-90 to 90)
-  // Normalize to -1 to 1 range
-  const normalizedX = (event.gamma || 0) / 45; // -1 to 1 (left to right)
-  const normalizedY = (event.beta || 0) / 45;   // -1 to 1 (top to bottom)
+  const gamma = event.gamma || 0;
+  const beta = event.beta || 0;
+  
+  // We define the neutral holding state:
+  // - left-to-right tilt (gamma) = 0 degrees
+  // - front-to-back tilt (beta) = 55 degrees (natural holding slope)
+  // A sensitivity range of +/- 20 degrees for gamma, and +/- 25 degrees for beta
+  const sensitivityX = 20;
+  const sensitivityY = 25;
+  
+  const normalizedX = gamma / sensitivityX;
+  // Invert Y: tilting phone more vertical (beta increases) aims higher (towards row 0, so negative tilt.y)
+  const normalizedY = -(beta - 55) / sensitivityY;
   
   // Clamp to -1 to 1
   deviceTilt.x = Math.max(-1, Math.min(1, normalizedX));
   deviceTilt.y = Math.max(-1, Math.min(1, normalizedY));
+  
+  updateAimVisualizer();
 }
 
 // Check if DeviceMotion needs explicit permissions (e.g. iOS Safari)
@@ -336,14 +378,26 @@ if (!accountId) {
   SyncHelper.init({
     role: 'mobile',
     accountId: accountId,
-    onInit: () => {
+    onInit: (data) => {
       connectionBadge.className = 'connection-badge';
       badgeText.innerText = `연결됨 (계정 ${accountId})`;
       console.log(`Mobile SyncHelper successfully established connection for Account ${accountId}`);
+      if (data && data.popped) {
+        mobilePoppedState = data.popped;
+        updateAimVisualizer();
+      }
+    },
+    onStateUpdate: (data) => {
+      if (data && data.popped) {
+        mobilePoppedState = data.popped;
+        updateAimVisualizer();
+      }
     },
     onReset: () => {
       resultOverlay.classList.remove('active');
       resetDartVisuals();
+      mobilePoppedState = Array(25).fill(false);
+      updateAimVisualizer();
     },
     onPrizeConfirmed: () => {
       resultOverlay.classList.remove('active');

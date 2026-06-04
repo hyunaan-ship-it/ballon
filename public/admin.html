@@ -69,11 +69,19 @@
           </div>
         </form>
 
-        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; gap: 8px; width: 100%;">
+            <button id="check-all-winner-info-btn" type="button" class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.8rem; background: rgba(0, 242, 254, 0.05); border-color: rgba(0, 242, 254, 0.2);">
+              ☑️ 일괄 체크
+            </button>
+            <button id="uncheck-all-winner-info-btn" type="button" class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.8rem; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15);">
+              ⬛ 일괄 해제
+            </button>
+          </div>
           <button id="save-winner-info-settings-btn" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem;">
             💾 당첨자 정보 입력 설정 저장
           </button>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; text-align: center;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">
             체크박스로 당첨자 정보 입력 필요 여부를 설정하세요.
           </div>
         </div>

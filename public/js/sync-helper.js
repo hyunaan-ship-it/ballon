@@ -176,8 +176,12 @@ class BalloonSyncHelper {
         if (!state || !state.prizes || !state.popped) {
           state = {
             prizes: defaultPrizes,
-            popped: Array(25).fill(false)
+            popped: Array(25).fill(false),
+            requireWinnerInfo: Array(25).fill(false)
           };
+          accountRef.child('state').set(state);
+        } else if (!state.requireWinnerInfo) {
+          state.requireWinnerInfo = Array(25).fill(false);
           accountRef.child('state').set(state);
         }
         
@@ -185,6 +189,7 @@ class BalloonSyncHelper {
           this.onInitCallback({
             prizes: state.prizes,
             popped: state.popped,
+            requireWinnerInfo: state.requireWinnerInfo || Array(25).fill(false),
             mobileUrl: window.location.origin + `/mobile.html?room=${this.room}&account=${this.accountId}`
           });
         }
@@ -349,14 +354,20 @@ class BalloonSyncHelper {
             const localKey = `balloon_state_acc_${this.accountId}`;
             let state = JSON.parse(localStorage.getItem(localKey)) || {
               prizes: defaultPrizes,
-              popped: Array(25).fill(false)
+              popped: Array(25).fill(false),
+              requireWinnerInfo: Array(25).fill(false)
             };
+            if (!state.requireWinnerInfo) {
+              state.requireWinnerInfo = Array(25).fill(false);
+              localStorage.setItem(localKey, JSON.stringify(state));
+            }
             this.channel.send({
               type: 'broadcast',
               event: 'init-state',
               payload: {
                 prizes: state.prizes,
                 popped: state.popped,
+                requireWinnerInfo: state.requireWinnerInfo,
                 mobileUrl: window.location.origin + `/mobile.html?room=${this.room}&account=${this.accountId}`
               }
             });
@@ -445,14 +456,19 @@ class BalloonSyncHelper {
             const localKey = `balloon_state_acc_${this.accountId}`;
             let state = JSON.parse(localStorage.getItem(localKey)) || {
               prizes: defaultPrizes,
-              popped: Array(25).fill(false)
+              popped: Array(25).fill(false),
+              requireWinnerInfo: Array(25).fill(false)
             };
+            if (!state.requireWinnerInfo) {
+              state.requireWinnerInfo = Array(25).fill(false);
+            }
             localStorage.setItem(localKey, JSON.stringify(state));
 
             if (this.onInitCallback) {
               this.onInitCallback({
                 prizes: state.prizes,
                 popped: state.popped,
+                requireWinnerInfo: state.requireWinnerInfo,
                 mobileUrl: window.location.origin + `/mobile.html?room=${this.room}&account=${this.accountId}`
               });
             }
@@ -499,32 +515,47 @@ class BalloonSyncHelper {
     }
 
     const isMiss = (req.intensity < 0.6) || (Math.random() < 0.15);
-    const randomIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
+    
+    // Find target index based on 2D tilt coordinates mapping
+    let targetIndex;
+    if (req.tilt && (req.tilt.x !== undefined || req.tilt.y !== undefined)) {
+      const col = Math.max(0, Math.min(4, Math.floor(((req.tilt.x + 1) / 2) * 5)));
+      const row = Math.max(0, Math.min(4, Math.floor(((req.tilt.y + 1) / 2) * 5)));
+      const tiltedIndex = row * 5 + col;
+      
+      let closestIndex = unpoppedIndices[0];
+      let minDistanceSq = Infinity;
+      for (const idx of unpoppedIndices) {
+        const r = Math.floor(idx / 5);
+        const c = idx % 5;
+        const distSq = Math.pow(row - r, 2) + Math.pow(col - c, 2);
+        if (distSq < minDistanceSq) {
+          minDistanceSq = distSq;
+          closestIndex = idx;
+        }
+      }
+      targetIndex = closestIndex;
+    } else {
+      targetIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
+    }
 
     if (isMiss) {
-      if (this.onMissTriggerCallback) {
-        this.onMissTriggerCallback({
-          index: randomIndex,
-          intensity: req.intensity || 1
-        });
-      }
-
       this.channel.send({
         type: 'broadcast',
         event: 'balloon-miss-trigger',
-        payload: { index: randomIndex, intensity: req.intensity || 1 }
+        payload: { index: targetIndex, intensity: req.intensity || 1 }
       });
 
       this.channel.send({
         type: 'broadcast',
         event: 'throw-response',
-        payload: { status: 'miss', index: randomIndex }
+        payload: { status: 'miss', index: targetIndex }
       });
       return;
     }
 
     // Success Hit!
-    state.popped[randomIndex] = true;
+    state.popped[targetIndex] = true;
     localStorage.setItem(localKey, JSON.stringify(state));
 
     // Broadcast new popped state
@@ -534,20 +565,12 @@ class BalloonSyncHelper {
       payload: state
     });
 
-    if (this.onPopTriggerCallback) {
-      this.onPopTriggerCallback({
-        index: randomIndex,
-        prize: state.prizes[randomIndex],
-        intensity: req.intensity || 1
-      });
-    }
-
     this.channel.send({
       type: 'broadcast',
       event: 'balloon-pop-trigger',
       payload: {
-        index: randomIndex,
-        prize: state.prizes[randomIndex],
+        index: targetIndex,
+        prize: state.prizes[targetIndex],
         intensity: req.intensity || 1
       }
     });
@@ -557,8 +580,9 @@ class BalloonSyncHelper {
       event: 'throw-response',
       payload: {
         status: 'success',
-        index: randomIndex,
-        prize: state.prizes[randomIndex]
+        index: targetIndex,
+        prize: state.prizes[targetIndex],
+        requireWinnerInfo: state.requireWinnerInfo ? state.requireWinnerInfo[targetIndex] : false
       }
     });
   }
@@ -602,8 +626,12 @@ class BalloonSyncHelper {
     if (!state || !state.prizes || !state.popped) {
       state = {
         prizes: defaultPrizes,
-        popped: Array(25).fill(false)
+        popped: Array(25).fill(false),
+        requireWinnerInfo: Array(25).fill(false)
       };
+      localStorage.setItem(localKey, JSON.stringify(state));
+    } else if (!state.requireWinnerInfo) {
+      state.requireWinnerInfo = Array(25).fill(false);
       localStorage.setItem(localKey, JSON.stringify(state));
     }
 
@@ -611,6 +639,7 @@ class BalloonSyncHelper {
       this.onInitCallback({
         prizes: state.prizes,
         popped: state.popped,
+        requireWinnerInfo: state.requireWinnerInfo,
         mobileUrl: window.location.origin + `/mobile.html?room=${this.room}&account=${this.accountId}`
       });
     }
@@ -634,31 +663,52 @@ class BalloonSyncHelper {
       }
 
       const isMiss = (req.intensity < 0.6) || (Math.random() < 0.15);
-      const randomIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
+      
+      let targetIndex;
+      if (req.tilt && (req.tilt.x !== undefined || req.tilt.y !== undefined)) {
+        const col = Math.max(0, Math.min(4, Math.floor(((req.tilt.x + 1) / 2) * 5)));
+        const row = Math.max(0, Math.min(4, Math.floor(((req.tilt.y + 1) / 2) * 5)));
+        
+        let closestIndex = unpoppedIndices[0];
+        let minDistanceSq = Infinity;
+        for (const idx of unpoppedIndices) {
+          const r = Math.floor(idx / 5);
+          const c = idx % 5;
+          const distSq = Math.pow(row - r, 2) + Math.pow(col - c, 2);
+          if (distSq < minDistanceSq) {
+            minDistanceSq = distSq;
+            closestIndex = idx;
+          }
+        }
+        targetIndex = closestIndex;
+      } else {
+        targetIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
+      }
 
       if (isMiss) {
         if (this.onMissTriggerCallback) {
-          this.onMissTriggerCallback({ index: randomIndex, intensity: req.intensity || 1 });
+          this.onMissTriggerCallback({ index: targetIndex, intensity: req.intensity || 1 });
         }
-        this.respondToFirebaseThrow({ status: 'miss', index: randomIndex });
+        this.respondToFirebaseThrow({ status: 'miss', index: targetIndex });
         return;
       }
 
-      state.popped[randomIndex] = true;
+      state.popped[targetIndex] = true;
       accountRef.child('state').set(state);
 
       if (this.onPopTriggerCallback) {
         this.onPopTriggerCallback({
-          index: randomIndex,
-          prize: state.prizes[randomIndex],
+          index: targetIndex,
+          prize: state.prizes[targetIndex],
           intensity: req.intensity || 1
         });
       }
 
       this.respondToFirebaseThrow({
         status: 'success',
-        index: randomIndex,
-        prize: state.prizes[randomIndex]
+        index: targetIndex,
+        prize: state.prizes[targetIndex],
+        requireWinnerInfo: state.requireWinnerInfo ? state.requireWinnerInfo[targetIndex] : false
       });
     });
   }
@@ -866,14 +916,40 @@ class BalloonSyncHelper {
         return;
       }
       const isMiss = (intensity < 0.6) || (Math.random() < 0.15);
-      const randomIndex = unpopped[Math.floor(Math.random() * unpopped.length)];
-      if (isMiss) {
-        onResult({ status: 'miss', index: randomIndex });
+      
+      let targetIndex;
+      if (extraData.tilt && (extraData.tilt.x !== undefined || extraData.tilt.y !== undefined)) {
+        const col = Math.max(0, Math.min(4, Math.floor(((extraData.tilt.x + 1) / 2) * 5)));
+        const row = Math.max(0, Math.min(4, Math.floor(((extraData.tilt.y + 1) / 2) * 5)));
+        
+        let closestIndex = unpopped[0];
+        let minDistanceSq = Infinity;
+        for (const idx of unpopped) {
+          const r = Math.floor(idx / 5);
+          const c = idx % 5;
+          const distSq = Math.pow(row - r, 2) + Math.pow(col - c, 2);
+          if (distSq < minDistanceSq) {
+            minDistanceSq = distSq;
+            closestIndex = idx;
+          }
+        }
+        targetIndex = closestIndex;
       } else {
-        state.popped[randomIndex] = true;
+        targetIndex = unpopped[Math.floor(Math.random() * unpopped.length)];
+      }
+
+      if (isMiss) {
+        onResult({ status: 'miss', index: targetIndex });
+      } else {
+        state.popped[targetIndex] = true;
         localStorage.setItem(localKey, JSON.stringify(state));
         if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
-        onResult({ status: 'success', index: randomIndex, prize: state.prizes[randomIndex] });
+        onResult({ 
+          status: 'success', 
+          index: targetIndex, 
+          prize: state.prizes[targetIndex],
+          requireWinnerInfo: state.requireWinnerInfo ? state.requireWinnerInfo[targetIndex] : false
+        });
       }
     } else if (this.mode === 'supabase') {
       this.onThrowResponseCallback = (data) => {
@@ -891,6 +967,7 @@ class BalloonSyncHelper {
       const throwReqRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/throw_request`);
       throwReqRef.set({
         intensity: intensity,
+        tilt: extraData.tilt || null,
         timestamp: Date.now()
       });
     }
