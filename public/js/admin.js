@@ -236,23 +236,78 @@ if (toggleAllWinnerInfo) {
   });
 }
 
+// Filter and download CSV client-side
+function downloadWinnersCSV() {
+  SyncHelper.getWinners((winners) => {
+    const startDateVal = document.getElementById('winner-start-date').value;
+    const endDateVal = document.getElementById('winner-end-date').value;
+    
+    let filteredWinners = winners;
+    if (startDateVal) {
+      const start = new Date(startDateVal);
+      filteredWinners = filteredWinners.filter(w => new Date(w.timestamp) >= start);
+    }
+    if (endDateVal) {
+      const end = new Date(endDateVal);
+      end.setHours(23, 59, 59, 999);
+      filteredWinners = filteredWinners.filter(w => new Date(w.timestamp) <= end);
+    }
+
+    if (filteredWinners.length === 0) {
+      alert('선택한 기간의 당첨자 정보가 없습니다.');
+      return;
+    }
+
+    // Generate CSV content
+    const headers = ['사번', '전화번호', '상품명', '입력 시간'];
+    const rows = filteredWinners.map(w => [w.employeeId, w.phoneNumber, w.prize, w.timestampFormatted || w.timestamp]);
+    const csvContent = [headers, ...rows].map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
+    
+    // Create Blob and trigger download
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv; charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `winners_account_${accountId}_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+
 // Download CSV functionality
 downloadCsvBtn.addEventListener('click', () => {
-  window.location.href = `/api/winners/${accountId}/csv`;
+  downloadWinnersCSV();
 });
 
-// Load winners count on init
+// Load winners count on init or date change
 function loadWinnersCount() {
-  fetch(`/api/winners/${accountId}`)
-    .then(res => res.json())
-    .then(data => {
-      const count = data.winners ? data.winners.length : 0;
-      winnersCountDiv.innerText = `당첨자: ${count}명`;
-    })
-    .catch(err => {
-      console.error('Failed to load winners count:', err);
-    });
+  SyncHelper.getWinners((winners) => {
+    const startDateVal = document.getElementById('winner-start-date').value;
+    const endDateVal = document.getElementById('winner-end-date').value;
+    
+    let filteredWinners = winners;
+    if (startDateVal) {
+      const start = new Date(startDateVal);
+      filteredWinners = filteredWinners.filter(w => new Date(w.timestamp) >= start);
+    }
+    if (endDateVal) {
+      const end = new Date(endDateVal);
+      end.setHours(23, 59, 59, 999);
+      filteredWinners = filteredWinners.filter(w => new Date(w.timestamp) <= end);
+    }
+    
+    const count = filteredWinners.length;
+    winnersCountDiv.innerText = `당첨자: ${count}명`;
+  });
 }
+
+// Listen to date changes
+const startDateInput = document.getElementById('winner-start-date');
+const endDateInput = document.getElementById('winner-end-date');
+if (startDateInput) startDateInput.addEventListener('change', loadWinnersCount);
+if (endDateInput) endDateInput.addEventListener('change', loadWinnersCount);
 
 // --- Account Selection Overlay & Switcher Routing ---
 const urlParams = new URLSearchParams(window.location.search);
@@ -311,6 +366,9 @@ if (!accountId) {
       currentPopped = data.popped;
       currentRequireWinnerInfo = data.requireWinnerInfo || Array(25).fill(false);
       syncUIWithData();
+    },
+    onNewWinner: (winner) => {
+      loadWinnersCount();
     }
   });
 }

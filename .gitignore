@@ -1,5 +1,6 @@
 node_modules/
 data.json
+winners.json
 .DS_Store
 *.log
 .gemini/

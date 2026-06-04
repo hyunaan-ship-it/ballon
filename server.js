@@ -153,6 +153,10 @@ function saveWinnersData() {
   }
 }
 
+// Express middlewares to parse request body
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Fallback to index.html for root path (Redirects mobile devices to mobile.html automatically)
 app.get('/', (req, res) => {
   const userAgent = req.headers['user-agent'] || '';
@@ -168,26 +172,80 @@ app.get('/', (req, res) => {
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// API endpoint to submit winner info via POST
+app.post('/api/winners/:accountId', (req, res) => {
+  const accountId = req.params.accountId || '1';
+  const { employeeId, phoneNumber, prize } = req.body;
+  
+  if (!employeeId || !phoneNumber || !prize) {
+    return res.status(400).json({ status: 'error', message: '모든 필드를 입력해주세요.' });
+  }
+
+  const winnerInfo = {
+    employeeId,
+    phoneNumber,
+    prize,
+    timestamp: new Date().toISOString(),
+    timestampFormatted: new Date().toLocaleString('ko-KR')
+  };
+
+  if (!winnersData[accountId]) {
+    winnersData[accountId] = [];
+  }
+  winnersData[accountId].push(winnerInfo);
+  saveWinnersData();
+
+  console.log(`Winner info submitted via POST for Account ${accountId}:`, winnerInfo);
+  
+  // Notify admin room via socket if possible
+  io.to(`admin-room-${accountId}`).emit('new-winner', winnerInfo);
+  
+  res.json({ status: 'success' });
+});
+
 // API endpoint to get winners data
 app.get('/api/winners/:accountId', (req, res) => {
   const accountId = req.params.accountId || '1';
-  const winners = winnersData[accountId] || [];
+  let winners = winnersData[accountId] || [];
+  
+  const { startDate, endDate } = req.query;
+  if (startDate) {
+    const start = new Date(startDate);
+    winners = winners.filter(w => new Date(w.timestamp) >= start);
+  }
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    winners = winners.filter(w => new Date(w.timestamp) <= end);
+  }
+  
   res.json({ winners });
 });
 
 // API endpoint to download winners as CSV
 app.get('/api/winners/:accountId/csv', (req, res) => {
   const accountId = req.params.accountId || '1';
-  const winners = winnersData[accountId] || [];
+  let winners = winnersData[accountId] || [];
+  
+  const { startDate, endDate } = req.query;
+  if (startDate) {
+    const start = new Date(startDate);
+    winners = winners.filter(w => new Date(w.timestamp) >= start);
+  }
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    winners = winners.filter(w => new Date(w.timestamp) <= end);
+  }
   
   if (winners.length === 0) {
-    return res.status(404).send('당첨자 정보가 없습니다.');
+    return res.status(404).send('해당 기간의 당첨자 정보가 없습니다.');
   }
   
   // Create CSV content
   const headers = ['사번', '전화번호', '상품명', '입력 시간'];
   const rows = winners.map(w => [w.employeeId, w.phoneNumber, w.prize, w.timestampFormatted]);
-  const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+  const csvContent = [headers, ...rows].map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
   
   // Set response headers for CSV download
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');

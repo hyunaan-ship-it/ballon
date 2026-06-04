@@ -132,7 +132,20 @@
           <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-top: -5px;">
             당첨자 정보를 확인하고 CSV로 다운로드할 수 있습니다.
           </p>
-          <button id="download-csv-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; margin-top: 10px;">
+          
+          <!-- Date Filter Inputs -->
+          <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="winner-start-date" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">시작일:</label>
+              <input type="date" id="winner-start-date" class="prize-field" style="padding: 6px 10px; font-size: 0.8rem; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: var(--text-primary); font-family: inherit;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="winner-end-date" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">종료일:</label>
+              <input type="date" id="winner-end-date" class="prize-field" style="padding: 6px 10px; font-size: 0.8rem; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: var(--text-primary); font-family: inherit;">
+            </div>
+          </div>
+
+          <button id="download-csv-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; margin-top: 12px;">
             📥 CSV 다운로드
           </button>
           <div id="winners-count" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; text-align: center;">

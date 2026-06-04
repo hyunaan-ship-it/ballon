@@ -25,9 +25,15 @@ class BalloonSyncHelper {
     this.lastProcessedResponseTime = 0;
     this.lastProcessedResetTime = 0;
     this.fallbackTimer = null;
+
+    // In-memory winners store: accumulates all winners received during this session.
+    // Used as the source of truth in supabase/fallback modes since localStorage
+    // is per-browser and cannot be shared between mobile and admin devices.
+    this._winnersStore = [];
+    this._winnersStoreLoaded = false;
   }
 
-  init({ role, accountId, onInit, onStateUpdate, onReset, onPopTrigger, onMissTrigger, onMobileCount, onPrizeConfirmed }) {
+  init({ role, accountId, onInit, onStateUpdate, onReset, onPopTrigger, onMissTrigger, onMobileCount, onPrizeConfirmed, onNewWinner }) {
     this.role = role;
     this.accountId = String(accountId || '1');
     this.room = getOrGenerateRoomId();
@@ -38,6 +44,7 @@ class BalloonSyncHelper {
     this.onMissTriggerCallback = onMissTrigger;
     this.onMobileCountCallback = onMobileCount;
     this.onPrizeConfirmedCallback = onPrizeConfirmed;
+    this.onNewWinnerCallback = onNewWinner;
 
     console.log(`[SyncHelper] Initializing in ${this.mode.toUpperCase()} mode for Account ${this.accountId}, Room ${this.room}`);
 
@@ -121,6 +128,12 @@ class BalloonSyncHelper {
       this.socket.on('prize-confirmed', () => {
         if (this.onPrizeConfirmedCallback) {
           this.onPrizeConfirmedCallback();
+        }
+      });
+
+      this.socket.on('new-winner', (winnerInfo) => {
+        if (this.onNewWinnerCallback) {
+          this.onNewWinnerCallback(winnerInfo);
         }
       });
     } catch (e) {
@@ -283,6 +296,15 @@ class BalloonSyncHelper {
           }
         });
       }
+
+      // Track winners in Firebase Realtime Database
+      const winnersRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/winners`);
+      winnersRef.on('child_added', (snapshot) => {
+        const val = snapshot.val();
+        if (val && this.onNewWinnerCallback) {
+          this.onNewWinnerCallback(val);
+        }
+      });
     } catch (e) {
       console.warn("[SyncHelper] Firebase initialization error:", e);
       if (this.fallbackTimer) {
@@ -427,6 +449,33 @@ class BalloonSyncHelper {
             if (this.onThrowResponseCallback) {
               this.onThrowResponseCallback(payload);
             }
+          }
+        })
+        .on('broadcast', { event: 'new-winner-broadcast' }, ({ payload }) => {
+          // Update in-memory store (works across all devices receiving the broadcast)
+          if (!this._winnersStoreLoaded) {
+            this._winnersStoreLoaded = true;
+          }
+          // Avoid duplicates (self-receive due to broadcast: { self: true })
+          const alreadyExists = this._winnersStore.some(
+            w => w.employeeId === payload.employeeId && w.timestamp === payload.timestamp
+          );
+          if (!alreadyExists) {
+            this._winnersStore.push(payload);
+          }
+          // Also persist to localStorage as backup
+          const localKey = `winners_list_acc_${this.accountId}`;
+          const list = JSON.parse(localStorage.getItem(localKey)) || [];
+          const existsInLocal = list.some(
+            w => w.employeeId === payload.employeeId && w.timestamp === payload.timestamp
+          );
+          if (!existsInLocal) {
+            list.push(payload);
+            localStorage.setItem(localKey, JSON.stringify(list));
+          }
+          
+          if (this.onNewWinnerCallback) {
+            this.onNewWinnerCallback(payload);
           }
         });
 
@@ -1024,14 +1073,164 @@ class BalloonSyncHelper {
   }
 
   submitWinnerInfo(employeeId, phoneNumber, prize, onResult) {
+    const winnerInfo = {
+      employeeId,
+      phoneNumber,
+      prize,
+      timestamp: new Date().toISOString(),
+      timestampFormatted: new Date().toLocaleString('ko-KR')
+    };
+
     if (this.mode === 'socket') {
-      this.socket.emit('submit-winner-info', { employeeId, phoneNumber, prize });
-      this.socket.once('winner-info-result', (data) => {
-        onResult(data);
+      // First try HTTP POST, then fallback to Socket.io emit
+      fetch(`/api/winners/${this.accountId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ employeeId, phoneNumber, prize })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          // Also update local in-memory store so admin's getWinners() reflects it immediately
+          this._winnersStore.push(winnerInfo);
+          onResult({ status: 'success' });
+        } else {
+          onResult({ status: 'error', message: data.message });
+        }
+      })
+      .catch(err => {
+        console.warn("[SyncHelper] HTTP winner submission failed, falling back to socket:", err);
+        this.socket.emit('submit-winner-info', { employeeId, phoneNumber, prize });
+        this.socket.once('winner-info-result', (data) => {
+          onResult(data);
+        });
       });
-    } else {
-      // For other modes, just return success (local fallback)
+    } else if (this.mode === 'firebase') {
+      try {
+        const winnersRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/winners`);
+        winnersRef.push(winnerInfo).then(() => {
+          onResult({ status: 'success' });
+        }).catch(err => {
+          onResult({ status: 'error', message: err.message });
+        });
+      } catch (e) {
+        onResult({ status: 'error', message: e.message });
+      }
+    } else if (this.mode === 'supabase') {
+      // Add to in-memory store immediately (so this device's getWinners() reflects it right away)
+      this._winnersStore.push(winnerInfo);
+      this._winnersStoreLoaded = true;
+
+      // Persist to localStorage as a local backup
+      const localKey = `winners_list_acc_${this.accountId}`;
+      const list = JSON.parse(localStorage.getItem(localKey)) || [];
+      list.push(winnerInfo);
+      localStorage.setItem(localKey, JSON.stringify(list));
+
+      // Also POST to server API for persistent storage (Vercel Serverless Function)
+      // This ensures data survives page refresh on the admin page.
+      fetch(`/api/winners/${this.accountId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId, phoneNumber, prize })
+      }).then(res => res.json())
+        .then(data => console.log('[SyncHelper] Winner persisted via API:', data.status))
+        .catch(err => console.warn('[SyncHelper] API persist failed (offline or no server), using broadcast only:', err));
+
+      // Broadcast to all connected clients (admin/host) via Supabase Realtime for real-time notification
+      if (this.channel) {
+        this.channel.send({
+          type: 'broadcast',
+          event: 'new-winner-broadcast',
+          payload: winnerInfo
+        }).then(() => {
+          console.log('[SyncHelper] Winner broadcast sent successfully via Supabase.');
+        }).catch(err => {
+          console.warn('[SyncHelper] Winner broadcast failed:', err);
+        });
+      } else {
+        console.warn('[SyncHelper] Supabase channel not available for winner broadcast.');
+      }
       onResult({ status: 'success' });
+    } else {
+      // Local fallback mode — save to in-memory store and localStorage
+      this._winnersStore.push(winnerInfo);
+      this._winnersStoreLoaded = true;
+      const localKey = `winners_list_acc_${this.accountId}`;
+      const list = JSON.parse(localStorage.getItem(localKey)) || [];
+      list.push(winnerInfo);
+      localStorage.setItem(localKey, JSON.stringify(list));
+      onResult({ status: 'success' });
+    }
+  }
+
+  getWinners(callback) {
+    if (this.mode === 'socket') {
+      fetch(`/api/winners/${this.accountId}`)
+        .then(res => res.json())
+        .then(data => {
+          // Merge server data with in-memory store to catch any race conditions
+          const serverWinners = data.winners || [];
+          callback(serverWinners);
+        })
+        .catch(err => {
+          console.warn("[SyncHelper] Failed to load winners via HTTP, using in-memory store:", err);
+          callback(this._winnersStore);
+        });
+    } else if (this.mode === 'firebase') {
+      if (this.db) {
+        const winnersRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/winners`);
+        winnersRef.once('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            const list = Object.values(val);
+            callback(list);
+          } else {
+            callback([]);
+          }
+        });
+      } else {
+        callback([]);
+      }
+    } else {
+      // Supabase or local-fallback mode:
+      // Primary: try to fetch from the server API (Vercel Serverless Function backed by Supabase DB)
+      // This ensures we get data submitted by other devices (e.g. mobile -> admin).
+      fetch(`/api/winners/${this.accountId}`)
+        .then(res => res.json())
+        .then(data => {
+          const apiWinners = data.winners || [];
+          // Merge API winners into in-memory store (avoid duplicates)
+          apiWinners.forEach(w => {
+            const exists = this._winnersStore.some(
+              s => s.employeeId === w.employeeId && s.timestamp === w.timestamp
+            );
+            if (!exists) this._winnersStore.push(w);
+          });
+          this._winnersStoreLoaded = true;
+          callback(this._winnersStore);
+        })
+        .catch(err => {
+          console.warn('[SyncHelper] API getWinners failed, using in-memory/localStorage:', err);
+          // Fall back to in-memory store (populated by broadcast events this session)
+          if (this._winnersStoreLoaded || this._winnersStore.length > 0) {
+            callback(this._winnersStore);
+          } else {
+            // Last resort: seed from localStorage
+            const localKey = `winners_list_acc_${this.accountId}`;
+            const list = JSON.parse(localStorage.getItem(localKey)) || [];
+            list.forEach(w => {
+              const exists = this._winnersStore.some(
+                s => s.employeeId === w.employeeId && s.timestamp === w.timestamp
+              );
+              if (!exists) this._winnersStore.push(w);
+            });
+            this._winnersStoreLoaded = true;
+            callback(this._winnersStore);
+          }
+        });
     }
   }
 

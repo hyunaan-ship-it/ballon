@@ -2,6 +2,8 @@
   "version": 2,
   "cleanUrls": true,
   "rewrites": [
+    { "source": "/api/winners/:accountId/csv", "destination": "/api/winners/[accountId]/csv" },
+    { "source": "/api/winners/:accountId", "destination": "/api/winners/[accountId]" },
     { "source": "/", "destination": "/public/index.html" },
     { "source": "/index.html", "destination": "/public/index.html" },
     { "source": "/admin.html", "destination": "/public/admin.html" },
