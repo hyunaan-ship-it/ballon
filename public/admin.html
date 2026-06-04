@@ -68,6 +68,15 @@
             <!-- 25 input cells will be dynamically injected here -->
           </div>
         </form>
+
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
+          <button id="save-winner-info-settings-btn" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem;">
+            💾 당첨자 정보 입력 설정 저장
+          </button>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; text-align: center;">
+            체크박스로 당첨자 정보 입력 필요 여부를 설정하세요.
+          </div>
+        </div>
       </section>
 
       <!-- Right: Control Center Sidebar -->
@@ -111,6 +120,20 @@
           
           <div class="alert-box" style="background: rgba(255, 23, 68, 0.02); border-color: rgba(255, 23, 68, 0.1); margin-top: 5px; font-size: 0.8rem;">
             ⚠️ <strong>풍선 리셋</strong>을 진행하면 터졌던 풍선들이 전부 재생성되며, <strong>경품 셔플</strong>을 진행할 경우 경품들의 위치가 무작위로 뒤바뀝니다!
+          </div>
+        </div>
+
+        <!-- Winners Management -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">🏆 당첨자 관리</h3>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-top: -5px;">
+            당첨자 정보를 확인하고 CSV로 다운로드할 수 있습니다.
+          </p>
+          <button id="download-csv-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; margin-top: 10px;">
+            📥 CSV 다운로드
+          </button>
+          <div id="winners-count" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; text-align: center;">
+            당첨자: 0명
           </div>
         </div>
 

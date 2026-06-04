@@ -16,6 +16,7 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
+const WINNERS_FILE = path.join(__dirname, 'winners.json');
 
 // Get local IPv4 address
 function getLocalIP() {
@@ -72,10 +73,18 @@ const defaultPrizes = [
 ];
 
 let accountsState = {
-  "1": { prizes: [...defaultPrizes], popped: Array(25).fill(false) },
-  "2": { prizes: [...defaultPrizes], popped: Array(25).fill(false) },
-  "3": { prizes: [...defaultPrizes], popped: Array(25).fill(false) },
-  "4": { prizes: [...defaultPrizes], popped: Array(25).fill(false) }
+  "1": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) },
+  "2": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) },
+  "3": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) },
+  "4": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) }
+};
+
+// Winners data structure
+let winnersData = {
+  "1": [],
+  "2": [],
+  "3": [],
+  "4": []
 };
 
 // Load existing data if available
@@ -86,7 +95,8 @@ if (fs.existsSync(DATA_FILE)) {
     if (data.prizes && data.popped) {
       accountsState["1"] = {
         prizes: data.prizes,
-        popped: data.popped
+        popped: data.popped,
+        requireWinnerInfo: data.requireWinnerInfo || Array(25).fill(false)
       };
       console.log("Legacy game state successfully migrated to Account 1");
     } else {
@@ -94,7 +104,8 @@ if (fs.existsSync(DATA_FILE)) {
         if (data[id]) {
           accountsState[id] = {
             prizes: data[id].prizes || [...defaultPrizes],
-            popped: data[id].popped || Array(25).fill(false)
+            popped: data[id].popped || Array(25).fill(false),
+            requireWinnerInfo: data[id].requireWinnerInfo || Array(25).fill(false)
           };
         }
       }
@@ -105,6 +116,21 @@ if (fs.existsSync(DATA_FILE)) {
   }
 }
 
+// Load winners data if available
+if (fs.existsSync(WINNERS_FILE)) {
+  try {
+    const data = JSON.parse(fs.readFileSync(WINNERS_FILE, 'utf8'));
+    for (const id of ["1", "2", "3", "4"]) {
+      if (data[id]) {
+        winnersData[id] = data[id] || [];
+      }
+    }
+    console.log("Winners data successfully loaded from winners.json");
+  } catch (err) {
+    console.error("Error loading winners.json, using defaults:", err);
+  }
+}
+
 saveGameState();
 
 function saveGameState() {
@@ -112,6 +138,14 @@ function saveGameState() {
     fs.writeFileSync(DATA_FILE, JSON.stringify(accountsState, null, 2), 'utf8');
   } catch (err) {
     console.error("Error saving game state:", err);
+  }
+}
+
+function saveWinnersData() {
+  try {
+    fs.writeFileSync(WINNERS_FILE, JSON.stringify(winnersData, null, 2), 'utf8');
+  } catch (err) {
+    console.error("Error saving winners data:", err);
   }
 }
 
@@ -130,6 +164,36 @@ app.get('/', (req, res) => {
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// API endpoint to get winners data
+app.get('/api/winners/:accountId', (req, res) => {
+  const accountId = req.params.accountId || '1';
+  const winners = winnersData[accountId] || [];
+  res.json({ winners });
+});
+
+// API endpoint to download winners as CSV
+app.get('/api/winners/:accountId/csv', (req, res) => {
+  const accountId = req.params.accountId || '1';
+  const winners = winnersData[accountId] || [];
+  
+  if (winners.length === 0) {
+    return res.status(404).send('당첨자 정보가 없습니다.');
+  }
+  
+  // Create CSV content
+  const headers = ['사번', '전화번호', '상품명', '입력 시간'];
+  const rows = winners.map(w => [w.employeeId, w.phoneNumber, w.prize, w.timestampFormatted]);
+  const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+  
+  // Set response headers for CSV download
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename=winners_account_${accountId}_${Date.now()}.csv`);
+  
+  // Add BOM for Excel UTF-8 compatibility
+  const bom = '\uFEFF';
+  res.send(bom + csvContent);
+});
+
 // Socket.io Real-Time Logic
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
@@ -141,10 +205,11 @@ io.on('connection', (socket) => {
     socket.accountId = accountId;
     console.log(`Host joined Account ${accountId}: ${socket.id}`);
 
-    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false) };
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) };
     socket.emit('init-state', {
       popped: state.popped,
       prizes: state.prizes,
+      requireWinnerInfo: state.requireWinnerInfo,
       mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
       localIp: LOCAL_IP
     });
@@ -157,10 +222,11 @@ io.on('connection', (socket) => {
     socket.accountId = accountId;
     console.log(`Mobile controller joined Account ${accountId}: ${socket.id}`);
 
-    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false) };
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) };
     socket.emit('init-state', {
       popped: state.popped,
       prizes: state.prizes,
+      requireWinnerInfo: state.requireWinnerInfo,
       mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
       localIp: LOCAL_IP
     });
@@ -176,10 +242,11 @@ io.on('connection', (socket) => {
     socket.accountId = accountId;
     console.log(`Admin joined Account ${accountId}: ${socket.id}`);
 
-    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false) };
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) };
     socket.emit('init-state', {
       popped: state.popped,
       prizes: state.prizes,
+      requireWinnerInfo: state.requireWinnerInfo,
       mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
       localIp: LOCAL_IP
     });
@@ -201,8 +268,20 @@ io.on('connection', (socket) => {
     if (state && Array.isArray(updatedPrizes) && updatedPrizes.length === 25) {
       state.prizes = updatedPrizes;
       saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
       console.log(`Prizes updated by Admin for Account ${accountId}`);
+    }
+  });
+
+  // Admin updates require winner info settings
+  socket.on('admin-update-require-winner-info', (requireWinnerInfo) => {
+    const accountId = socket.accountId || '1';
+    const state = accountsState[accountId];
+    if (state && Array.isArray(requireWinnerInfo) && requireWinnerInfo.length === 25) {
+      state.requireWinnerInfo = requireWinnerInfo;
+      saveGameState();
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
+      console.log(`Require winner info updated by Admin for Account ${accountId}`);
     }
   });
 
@@ -223,7 +302,7 @@ io.on('connection', (socket) => {
         console.log(`Board reset (prizes maintained) for Account ${accountId}`);
       }
       saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
       io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
     }
   });
@@ -235,7 +314,7 @@ io.on('connection', (socket) => {
     if (state && index >= 0 && index < 25) {
       state.popped[index] = !state.popped[index];
       saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
       console.log(`Admin toggled popped state of index ${index} to ${state.popped[index]} for Account ${accountId}`);
     }
   });
@@ -246,7 +325,7 @@ io.on('connection', (socket) => {
     const state = accountsState[accountId];
     if (!state) return;
 
-    console.log(`Dart thrown from mobile: ${socket.id} on Account ${accountId} with intensity:`, data.intensity || 1);
+    console.log(`Dart thrown from mobile: ${socket.id} on Account ${accountId} with intensity:`, data.intensity || 1, 'tilt:', data.tilt);
 
     // Find unpopped balloons
     const unpoppedIndices = [];
@@ -261,7 +340,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Determine if it is a miss
+    // Determine if it is a miss (intensity threshold)
     const isMiss = (data.intensity < 0.6) || (Math.random() < 0.15);
 
     if (isMiss) {
@@ -277,14 +356,38 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Pick a random unpopped balloon (Hit Success!)
-    const randomIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
-    state.popped[randomIndex] = true;
+    // Calculate target index based on tilt (if provided)
+    let targetIndex;
+    if (data.tilt && (data.tilt.x !== undefined || data.tilt.y !== undefined)) {
+      // Map tilt to 5x5 grid (0-24)
+      // tilt.x: -1 to 1 (left to right), tilt.y: -1 to 1 (top to bottom)
+      const col = Math.floor(((data.tilt.x + 1) / 2) * 5);
+      const row = Math.floor(((data.tilt.y + 1) / 2) * 5);
+      const tiltedIndex = row * 5 + col;
+      
+      // Find closest unpopped balloon to tilted position
+      let closestIndex = unpoppedIndices[0];
+      let minDistance = Math.abs(tiltedIndex - closestIndex);
+      
+      for (const idx of unpoppedIndices) {
+        const distance = Math.abs(tiltedIndex - idx);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = idx;
+        }
+      }
+      targetIndex = closestIndex;
+    } else {
+      // Random selection if no tilt data
+      targetIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
+    }
+
+    state.popped[targetIndex] = true;
     saveGameState();
 
     const result = {
-      index: randomIndex,
-      prize: state.prizes[randomIndex],
+      index: targetIndex,
+      prize: state.prizes[targetIndex],
       intensity: data.intensity || 1
     };
 
@@ -294,8 +397,9 @@ io.on('connection', (socket) => {
     // Send back success to the mobile client
     socket.emit('throw-result', {
       status: 'success',
-      index: randomIndex,
-      prize: state.prizes[randomIndex]
+      index: targetIndex,
+      prize: state.prizes[targetIndex],
+      requireWinnerInfo: state.requireWinnerInfo[targetIndex]
     });
 
     // Sync state to all clients in this account
@@ -307,6 +411,34 @@ io.on('connection', (socket) => {
     const accountId = socket.accountId || '1';
     console.log(`Prize claim confirmed on Account ${accountId}`);
     io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).to(`admin-room-${accountId}`).emit('prize-confirmed');
+  });
+
+  // Winner submits their information
+  socket.on('submit-winner-info', (data) => {
+    const accountId = socket.accountId || '1';
+    const { employeeId, phoneNumber, prize } = data;
+    
+    if (!employeeId || !phoneNumber || !prize) {
+      socket.emit('winner-info-result', { status: 'error', message: '모든 필드를 입력해주세요.' });
+      return;
+    }
+
+    const winnerInfo = {
+      employeeId,
+      phoneNumber,
+      prize,
+      timestamp: new Date().toISOString(),
+      timestampFormatted: new Date().toLocaleString('ko-KR')
+    };
+
+    winnersData[accountId].push(winnerInfo);
+    saveWinnersData();
+
+    console.log(`Winner info submitted for Account ${accountId}:`, winnerInfo);
+    socket.emit('winner-info-result', { status: 'success' });
+    
+    // Notify admin room about new winner
+    io.to(`admin-room-${accountId}`).emit('new-winner', winnerInfo);
   });
 
   // Direct pop from Host (click balloon directly as fallback)

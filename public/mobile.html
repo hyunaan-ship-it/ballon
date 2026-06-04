@@ -119,6 +119,17 @@
     <div class="feedback-title" id="result-title">🎯 다트 명중!</div>
     <div id="result-desc" style="font-size: 0.95rem; color: var(--text-secondary); margin-top: 8px;">획득한 경품은 바로...</div>
     <div class="feedback-prize" id="result-prize">스타벅스 커피 쿠폰</div>
+    
+    <!-- Winner Info Form (shown only on prize win) -->
+    <div id="winner-info-form" style="display: none; margin-top: 20px; width: 100%;">
+      <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">당첨 정보를 입력해주세요:</div>
+      <input type="text" id="employee-id" placeholder="사번" style="width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white; font-size: 0.9rem;">
+      <input type="tel" id="phone-number" placeholder="전화번호" style="width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white; font-size: 0.9rem;">
+      <button class="btn-primary" id="submit-winner-btn" style="width: 100%; justify-content: center; padding: 10px 20px;">
+        정보 제출하기
+      </button>
+    </div>
+    
     <button class="btn-primary" id="result-confirm-btn" style="margin-top: 20px; width: 100%; justify-content: center; padding: 10px 20px;">
       다시 준비하기
     </button>

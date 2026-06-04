@@ -13,6 +13,10 @@ let touchStartX = 0;
 let touchStartY = 0;
 let touchStartTime = 0;
 
+// Device orientation (tilt) for targeting
+let deviceTilt = { x: 0, y: 0 };
+let currentPrize = null;
+
 // DOM Elements
 const connectionBadge = document.getElementById('connection-badge');
 const badgeText = document.getElementById('badge-text');
@@ -26,6 +30,10 @@ const resultConfirmBtn = document.getElementById('result-confirm-btn');
 const permissionOverlay = document.getElementById('permission-overlay');
 const requestPermBtn = document.getElementById('request-perm-btn');
 const skipPermBtn = document.getElementById('skip-perm-btn');
+const winnerInfoForm = document.getElementById('winner-info-form');
+const employeeIdInput = document.getElementById('employee-id');
+const phoneNumberInput = document.getElementById('phone-number');
+const submitWinnerBtn = document.getElementById('submit-winner-btn');
 
 // Haptic feedback helper
 function triggerHaptic(type) {
@@ -68,8 +76,8 @@ function triggerThrow(intensity = 1.0) {
   dartPin.style.transform = 'translateY(-150vh) rotate(-45deg) scale(0.2)';
   dartPin.style.opacity = '0';
   
-  // Sync with unified SyncHelper layer
-  SyncHelper.throwDart(parseFloat(intensity.toFixed(2)), (data) => {
+  // Sync with unified SyncHelper layer (include tilt data)
+  SyncHelper.throwDart(parseFloat(intensity.toFixed(2)), { tilt: deviceTilt }, (data) => {
     handleThrowResult(data);
   });
   
@@ -122,6 +130,20 @@ function handleDeviceMotion(event) {
   }
 }
 
+// Device orientation handling for tilt-based targeting
+function handleDeviceOrientation(event) {
+  if (!event.beta || !event.gamma) return;
+  
+  // beta: front-to-back tilt (-180 to 180), gamma: left-to-right tilt (-90 to 90)
+  // Normalize to -1 to 1 range
+  const normalizedX = (event.gamma || 0) / 45; // -1 to 1 (left to right)
+  const normalizedY = (event.beta || 0) / 45;   // -1 to 1 (top to bottom)
+  
+  // Clamp to -1 to 1
+  deviceTilt.x = Math.max(-1, Math.min(1, normalizedX));
+  deviceTilt.y = Math.max(-1, Math.min(1, normalizedY));
+}
+
 // Check if DeviceMotion needs explicit permissions (e.g. iOS Safari)
 function checkMotionSensors() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -134,6 +156,7 @@ function checkMotionSensors() {
   } else {
     // Android / Desktop auto-activates standard listeners
     window.addEventListener('devicemotion', handleDeviceMotion, true);
+    window.addEventListener('deviceorientation', handleDeviceOrientation, true);
     hasMotionPermission = true;
   }
 }
@@ -194,6 +217,7 @@ requestPermBtn.addEventListener('click', () => {
       .then(response => {
         if (response === 'granted') {
           window.addEventListener('devicemotion', handleDeviceMotion, true);
+          window.addEventListener('deviceorientation', handleDeviceOrientation, true);
           hasMotionPermission = true;
           alert("모션 센서가 성공적으로 승인되었습니다! 스마트폰을 휘둘러 던지실 수 있습니다.");
         } else {
@@ -218,6 +242,28 @@ resultConfirmBtn.addEventListener('click', () => {
   SyncHelper.confirmPrizeClaim();
 });
 
+// Winner info form submission
+submitWinnerBtn.addEventListener('click', () => {
+  const employeeId = employeeIdInput.value.trim();
+  const phoneNumber = phoneNumberInput.value.trim();
+  
+  if (!employeeId || !phoneNumber) {
+    alert('사번과 전화번호를 모두 입력해주세요.');
+    return;
+  }
+  
+  SyncHelper.submitWinnerInfo(employeeId, phoneNumber, currentPrize, (response) => {
+    if (response.status === 'success') {
+      alert('당첨 정보가 제출되었습니다!');
+      winnerInfoForm.style.display = 'none';
+      employeeIdInput.value = '';
+      phoneNumberInput.value = '';
+    } else {
+      alert(response.message || '제출 중 오류가 발생했습니다.');
+    }
+  });
+});
+
 // Receive result from backend or Firebase throw request
 function handleThrowResult(data) {
   const resultTitle = document.getElementById('result-title');
@@ -225,6 +271,7 @@ function handleThrowResult(data) {
   
   if (data.status === 'success') {
     triggerHaptic('hit');
+    currentPrize = data.prize;
     
     // Show winner result overlay card
     setTimeout(() => {
@@ -232,6 +279,15 @@ function handleThrowResult(data) {
       if (resultDesc) resultDesc.innerText = "획득한 경품은 바로...";
       resultPrize.innerText = data.prize;
       resultOverlay.classList.add('active');
+      
+      // Show winner info form if prize requires winner info (checked by admin)
+      if (data.requireWinnerInfo) {
+        winnerInfoForm.style.display = 'block';
+        resultConfirmBtn.style.display = 'none';
+      } else {
+        winnerInfoForm.style.display = 'none';
+        resultConfirmBtn.style.display = 'block';
+      }
     }, 700);
   } else if (data.status === 'miss') {
     triggerHaptic('throw'); // Short haptic pulse
@@ -242,6 +298,8 @@ function handleThrowResult(data) {
       if (resultDesc) resultDesc.innerText = "아쉽게도 풍선을 비껴갔습니다.";
       resultPrize.innerText = "다시 조준해서 던져보세요!";
       resultOverlay.classList.add('active');
+      winnerInfoForm.style.display = 'none';
+      resultConfirmBtn.style.display = 'block';
     }, 700);
   } else {
     alert(data.message || "오류가 발생했습니다!");

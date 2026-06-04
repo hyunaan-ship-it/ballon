@@ -847,9 +847,9 @@ class BalloonSyncHelper {
     }
   }
 
-  throwDart(intensity, onResult) {
+  throwDart(intensity, extraData = {}, onResult) {
     if (this.mode === 'socket') {
-      this.socket.emit('mobile-throw', { intensity: intensity });
+      this.socket.emit('mobile-throw', { intensity: intensity, ...extraData });
       this.socket.once('throw-result', (data) => {
         onResult(data);
       });
@@ -882,7 +882,7 @@ class BalloonSyncHelper {
       this.channel.send({
         type: 'broadcast',
         event: 'throw-request',
-        payload: { intensity: intensity }
+        payload: { intensity: intensity, ...extraData }
       });
     } else {
       this.onThrowResponseCallback = (data) => {
@@ -892,6 +892,48 @@ class BalloonSyncHelper {
       throwReqRef.set({
         intensity: intensity,
         timestamp: Date.now()
+      });
+    }
+  }
+
+  submitWinnerInfo(employeeId, phoneNumber, prize, onResult) {
+    if (this.mode === 'socket') {
+      this.socket.emit('submit-winner-info', { employeeId, phoneNumber, prize });
+      this.socket.once('winner-info-result', (data) => {
+        onResult(data);
+      });
+    } else {
+      // For other modes, just return success (local fallback)
+      onResult({ status: 'success' });
+    }
+  }
+
+  updateRequireWinnerInfo(requireWinnerInfo) {
+    if (this.mode === 'socket') {
+      this.socket.emit('admin-update-require-winner-info', requireWinnerInfo);
+    } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
+      const localKey = `balloon_state_acc_${this.accountId}`;
+      let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
+      state.requireWinnerInfo = requireWinnerInfo;
+      localStorage.setItem(localKey, JSON.stringify(state));
+      
+      if (this.mode === 'supabase') {
+        this.channel.send({
+          type: 'broadcast',
+          event: 'state-updated',
+          payload: state
+        });
+      } else {
+        if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
+      }
+    } else {
+      const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/state`);
+      stateRef.once('value', (snapshot) => {
+        const state = snapshot.val();
+        if (state) {
+          state.requireWinnerInfo = requireWinnerInfo;
+          stateRef.set(state);
+        }
       });
     }
   }

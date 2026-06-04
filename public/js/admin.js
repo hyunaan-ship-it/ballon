@@ -4,12 +4,16 @@
 // Store live states
 let currentPrizes = [];
 let currentPopped = [];
+let currentRequireWinnerInfo = [];
 
 const adminPrizeGrid = document.getElementById('admin-prize-grid');
 const prizeForm = document.getElementById('prize-form');
 const saveBtn = document.getElementById('save-prizes-btn');
 const opResetBtn = document.getElementById('op-reset');
 const opShuffleBtn = document.getElementById('op-shuffle');
+const downloadCsvBtn = document.getElementById('download-csv-btn');
+const winnersCountDiv = document.getElementById('winners-count');
+const saveWinnerInfoSettingsBtn = document.getElementById('save-winner-info-settings-btn');
 
 // Quick Presets
 const presetBalancedBtn = document.getElementById('preset-balanced');
@@ -41,9 +45,35 @@ function buildGridStructure() {
     input.placeholder = `경품 내용을 입력하세요`;
     input.required = true;
     
+    // Winner info checkbox
+    const checkboxContainer = document.createElement('div');
+    checkboxContainer.style.display = 'flex';
+    checkboxContainer.style.alignItems = 'center';
+    checkboxContainer.style.gap = '6px';
+    checkboxContainer.style.marginTop = '8px';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `require-winner-info-${i}`;
+    checkbox.className = 'winner-info-checkbox';
+    checkbox.style.width = '16px';
+    checkbox.style.height = '16px';
+    checkbox.style.cursor = 'pointer';
+    
+    const checkboxLabel = document.createElement('label');
+    checkboxLabel.htmlFor = `require-winner-info-${i}`;
+    checkboxLabel.style.fontSize = '0.75rem';
+    checkboxLabel.style.color = 'var(--text-secondary)';
+    checkboxLabel.style.cursor = 'pointer';
+    checkboxLabel.innerText = '당첨자 정보 입력 필요';
+    
+    checkboxContainer.appendChild(checkbox);
+    checkboxContainer.appendChild(checkboxLabel);
+    
     cell.appendChild(indexTag);
     cell.appendChild(statusTag);
     cell.appendChild(input);
+    cell.appendChild(checkboxContainer);
     
     adminPrizeGrid.appendChild(cell);
   }
@@ -55,9 +85,14 @@ function syncUIWithData() {
     const input = document.getElementById(`prize-input-${i}`);
     const statusTag = document.getElementById(`status-tag-${i}`);
     const cell = document.getElementById(`admin-cell-${i}`);
+    const checkbox = document.getElementById(`require-winner-info-${i}`);
     
     if (input) {
       input.value = currentPrizes[i] || '';
+    }
+    
+    if (checkbox) {
+      checkbox.checked = currentRequireWinnerInfo[i] || false;
     }
     
     if (statusTag && cell) {
@@ -179,6 +214,36 @@ opShuffleBtn.addEventListener('click', () => {
   }
 });
 
+// Save winner info settings
+saveWinnerInfoSettingsBtn.addEventListener('click', () => {
+  const requireWinnerInfo = [];
+  for (let i = 0; i < 25; i++) {
+    const checkbox = document.getElementById(`require-winner-info-${i}`);
+    requireWinnerInfo.push(checkbox ? checkbox.checked : false);
+  }
+  
+  SyncHelper.updateRequireWinnerInfo(requireWinnerInfo);
+  alert("당첨자 정보 입력 설정이 저장되었습니다!");
+});
+
+// Download CSV functionality
+downloadCsvBtn.addEventListener('click', () => {
+  window.location.href = `/api/winners/${accountId}/csv`;
+});
+
+// Load winners count on init
+function loadWinnersCount() {
+  fetch(`/api/winners/${accountId}`)
+    .then(res => res.json())
+    .then(data => {
+      const count = data.winners ? data.winners.length : 0;
+      winnersCountDiv.innerText = `당첨자: ${count}명`;
+    })
+    .catch(err => {
+      console.error('Failed to load winners count:', err);
+    });
+}
+
 // --- Account Selection Overlay & Switcher Routing ---
 const urlParams = new URLSearchParams(window.location.search);
 let accountId = urlParams.get('account');
@@ -225,13 +290,16 @@ if (!accountId) {
     onInit: (data) => {
       currentPrizes = data.prizes;
       currentPopped = data.popped;
+      currentRequireWinnerInfo = data.requireWinnerInfo || Array(25).fill(false);
       buildGridStructure();
       syncUIWithData();
+      loadWinnersCount();
       console.log(`Admin SyncHelper successfully loaded data for Account ${accountId}`);
     },
     onStateUpdate: (data) => {
       currentPrizes = data.prizes;
       currentPopped = data.popped;
+      currentRequireWinnerInfo = data.requireWinnerInfo || Array(25).fill(false);
       syncUIWithData();
     }
   });
