@@ -172,6 +172,14 @@ app.get('/', (req, res) => {
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// API endpoint to get configuration (Supabase credentials) from environment variables
+app.get('/api/config', (req, res) => {
+  res.json({
+    supabaseUrl: process.env.SUPABASE_URL || 'https://dmmgkrtxszjogdjhdwde.supabase.co',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || 'sb_publishable_kfpjWCVFzozRMGCIo1tPxg_59HRk81F'
+  });
+});
+
 // API endpoint to submit winner info via POST
 app.post('/api/winners/:accountId', (req, res) => {
   const accountId = req.params.accountId || '1';
@@ -221,6 +229,21 @@ app.delete('/api/winners/:accountId', (req, res) => {
 });
 
 
+// Phone number formatting helper to force 010-XXXX-XXXX format
+function formatPhoneNumber(phone) {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/\D/g, '');
+  if (cleaned.startsWith('10') && cleaned.length === 10) {
+    cleaned = '0' + cleaned;
+  }
+  if (cleaned.length === 11) {
+    return cleaned.slice(0, 3) + '-' + cleaned.slice(3, 7) + '-' + cleaned.slice(7);
+  } else if (cleaned.length === 10) {
+    return cleaned.slice(0, 3) + '-' + cleaned.slice(3, 6) + '-' + cleaned.slice(6);
+  }
+  return phone;
+}
+
 // API endpoint to get winners data
 app.get('/api/winners/:accountId', (req, res) => {
   const accountId = req.params.accountId || '1';
@@ -228,12 +251,13 @@ app.get('/api/winners/:accountId', (req, res) => {
   
   const { startDate, endDate } = req.query;
   if (startDate) {
-    const start = new Date(startDate);
+    const startIso = startDate.includes('T') ? startDate : `${startDate}T00:00:00+09:00`;
+    const start = new Date(startIso);
     winners = winners.filter(w => new Date(w.timestamp) >= start);
   }
   if (endDate) {
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    const endIso = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999+09:00`;
+    const end = new Date(endIso);
     winners = winners.filter(w => new Date(w.timestamp) <= end);
   }
   
@@ -247,12 +271,13 @@ app.get('/api/winners/:accountId/csv', (req, res) => {
   
   const { startDate, endDate } = req.query;
   if (startDate) {
-    const start = new Date(startDate);
+    const startIso = startDate.includes('T') ? startDate : `${startDate}T00:00:00+09:00`;
+    const start = new Date(startIso);
     winners = winners.filter(w => new Date(w.timestamp) >= start);
   }
   if (endDate) {
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    const endIso = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999+09:00`;
+    const end = new Date(endIso);
     winners = winners.filter(w => new Date(w.timestamp) <= end);
   }
   
@@ -262,7 +287,7 @@ app.get('/api/winners/:accountId/csv', (req, res) => {
   
   // Create CSV content
   const headers = ['사번', '전화번호', '상품명', '입력 시간'];
-  const rows = winners.map(w => [w.employeeId, w.phoneNumber, w.prize, w.timestampFormatted]);
+  const rows = winners.map(w => [w.employeeId, formatPhoneNumber(w.phoneNumber), w.prize, w.timestampFormatted]);
   const csvContent = [headers, ...rows].map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
   
   // Set response headers for CSV download

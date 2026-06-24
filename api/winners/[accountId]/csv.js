@@ -19,6 +19,21 @@ async function supabaseFetch(path) {
   return res.json();
 }
 
+// Phone number formatting helper to force 010-XXXX-XXXX format
+function formatPhoneNumber(phone) {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/\D/g, '');
+  if (cleaned.startsWith('10') && cleaned.length === 10) {
+    cleaned = '0' + cleaned;
+  }
+  if (cleaned.length === 11) {
+    return cleaned.slice(0, 3) + '-' + cleaned.slice(3, 7) + '-' + cleaned.slice(7);
+  } else if (cleaned.length === 10) {
+    return cleaned.slice(0, 3) + '-' + cleaned.slice(3, 6) + '-' + cleaned.slice(6);
+  }
+  return phone;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -28,11 +43,13 @@ export default async function handler(req, res) {
 
   try {
     let query = `/winners?account_id=eq.${encodeURIComponent(accountId)}&order=created_at.asc`;
-    if (startDate) query += `&created_at=gte.${encodeURIComponent(startDate)}`;
+    if (startDate) {
+      const startIso = startDate.includes('T') ? startDate : `${startDate}T00:00:00+09:00`;
+      query += `&created_at=gte.${encodeURIComponent(startIso)}`;
+    }
     if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      query += `&created_at=lte.${encodeURIComponent(end.toISOString())}`;
+      const endIso = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999+09:00`;
+      query += `&created_at=lte.${encodeURIComponent(endIso)}`;
     }
 
     const rows = await supabaseFetch(query);
@@ -43,7 +60,7 @@ export default async function handler(req, res) {
     const headers = ['사번', '전화번호', '상품명', '입력 시간'];
     const csvRows = rows.map(r => [
       r.employee_id,
-      r.phone_number,
+      formatPhoneNumber(r.phone_number),
       r.prize,
       new Date(r.created_at).toLocaleString('ko-KR')
     ]);

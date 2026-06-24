@@ -33,7 +33,7 @@ async function supabaseFetch(path, options = {}) {
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -51,12 +51,12 @@ export default async function handler(req, res) {
       const { startDate, endDate } = req.query;
       let query = `/winners?account_id=eq.${encodeURIComponent(accountId)}&order=created_at.asc`;
       if (startDate) {
-        query += `&created_at=gte.${encodeURIComponent(startDate)}`;
+        const startIso = startDate.includes('T') ? startDate : `${startDate}T00:00:00+09:00`;
+        query += `&created_at=gte.${encodeURIComponent(startIso)}`;
       }
       if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        query += `&created_at=lte.${encodeURIComponent(end.toISOString())}`;
+        const endIso = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999+09:00`;
+        query += `&created_at=lte.${encodeURIComponent(endIso)}`;
       }
 
       const rows = await supabaseFetch(query);
@@ -98,6 +98,19 @@ export default async function handler(req, res) {
       // If Supabase table doesn't exist yet, still return success
       // (data was already saved via Supabase broadcast on client side)
       return res.status(200).json({ status: 'success', warning: err.message });
+    }
+  }
+
+  // DELETE /api/winners/:accountId - clear all winners
+  if (req.method === 'DELETE') {
+    try {
+      await supabaseFetch(`/winners?account_id=eq.${encodeURIComponent(accountId)}`, {
+        method: 'DELETE'
+      });
+      return res.status(200).json({ status: 'success', message: '당첨자 기록이 삭제되었습니다.' });
+    } catch (err) {
+      console.error('[API] DELETE winners error:', err.message);
+      return res.status(500).json({ status: 'error', message: err.message });
     }
   }
 

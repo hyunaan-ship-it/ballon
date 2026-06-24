@@ -344,7 +344,21 @@ class BalloonSyncHelper {
     }
   }
 
-  _setupSupabaseClient() {
+  async _setupSupabaseClient() {
+    try {
+      const configRes = await fetch('/api/config').catch(() => null);
+      if (configRes && configRes.ok) {
+        const configData = await configRes.json();
+        if (configData.supabaseUrl && configData.supabaseAnonKey) {
+          SYNC_CONFIG.supabase.url = configData.supabaseUrl;
+          SYNC_CONFIG.supabase.anonKey = configData.supabaseAnonKey;
+          console.log("[SyncHelper] Loaded dynamic Supabase config from server:", SYNC_CONFIG.supabase.url);
+        }
+      }
+    } catch (err) {
+      console.warn("[SyncHelper] Failed to fetch server config, using local defaults:", err);
+    }
+
     if (!SYNC_CONFIG.supabase || !SYNC_CONFIG.supabase.url || !SYNC_CONFIG.supabase.anonKey || SYNC_CONFIG.supabase.url.includes('your-supabase')) {
       console.warn("[SyncHelper] Supabase credentials not configured! Falling back to local sandbox.");
       this._fallbackToLocal("Supabase credentials missing or placeholder");

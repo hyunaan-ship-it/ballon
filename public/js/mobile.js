@@ -35,6 +35,22 @@ const employeeIdInput = document.getElementById('employee-id');
 const phoneNumberInput = document.getElementById('phone-number');
 const submitWinnerBtn = document.getElementById('submit-winner-btn');
 
+if (phoneNumberInput) {
+  phoneNumberInput.addEventListener('input', (e) => {
+    let val = e.target.value.replace(/[^0-9]/g, '');
+    let formatted = '';
+    if (val.length <= 3) {
+      formatted = val;
+    } else if (val.length <= 7) {
+      formatted = val.slice(0, 3) + '-' + val.slice(3);
+    } else {
+      formatted = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11);
+    }
+    e.target.value = formatted;
+  });
+}
+
+
 // Haptic feedback helper
 function triggerHaptic(type) {
   if (!('vibrate' in navigator)) return;
@@ -297,6 +313,12 @@ submitWinnerBtn.addEventListener('click', () => {
   
   if (!employeeId || !phoneNumber) {
     alert('사번과 전화번호를 모두 입력해주세요.');
+    return;
+  }
+
+  const phoneRegex = /^010-\d{3,4}-\d{4}$/;
+  if (!phoneRegex.test(phoneNumber)) {
+    alert('전화번호는 010-1234-1234 형식으로 입력해주세요.');
     return;
   }
   

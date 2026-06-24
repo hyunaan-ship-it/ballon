@@ -8,6 +8,9 @@ const SYNC_CONFIG = {
   // - 'supabase': Uses serverless Supabase Realtime Broadcast (extreme low-latency, free, and zero SQL tables setup needed!)
   mode: (window.location.hostname.includes('vercel.app') || window.location.href.includes('mode=supabase')) ? 'supabase' : 'socket', 
 
+  // Connection failure warning banner toggle (set to true to completely hide the yellow offline warning banner on the host screen)
+  suppressWarningBanner: false,
+
   // Firebase configuration (used when mode is 'firebase')
   firebase: {
     databaseURL: "https://balloon-game-rtdb-default-rtdb.asia-southeast1.firebasedatabase.app"

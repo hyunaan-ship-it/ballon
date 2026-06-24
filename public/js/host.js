@@ -751,6 +751,14 @@ editSaveBtn.addEventListener('click', () => {
 
 // Handle Sync fallback notification for a stellar user guidance!
 window.addEventListener('sync-fallback-active', (e) => {
+  // If the user has globally disabled warning banners or previously dismissed this warning, do not display it.
+  if (typeof SYNC_CONFIG !== 'undefined' && SYNC_CONFIG.suppressWarningBanner) {
+    return;
+  }
+  if (localStorage.getItem('hide_sync_warning') === 'true') {
+    return;
+  }
+
   const alertBanner = document.createElement('div');
   alertBanner.className = 'glass-panel';
   alertBanner.style.position = 'fixed';
@@ -786,7 +794,7 @@ window.addEventListener('sync-fallback-active', (e) => {
     <div>
       ${explanation}
     </div>
-    <button onclick="this.parentElement.remove()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #aaa; cursor: pointer; font-weight: bold; font-size: 1.1rem; transition: color 0.2s;">×</button>
+    <button onclick="localStorage.setItem('hide_sync_warning', 'true'); this.parentElement.remove()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #aaa; cursor: pointer; font-weight: bold; font-size: 1.1rem; transition: color 0.2s;">×</button>
   `;
   
   // Style absolute hover close

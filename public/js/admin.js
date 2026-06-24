@@ -237,6 +237,21 @@ if (toggleAllWinnerInfo) {
   });
 }
 
+// Phone number formatting helper to force 010-XXXX-XXXX format
+function formatPhoneNumber(phone) {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/\D/g, '');
+  if (cleaned.startsWith('10') && cleaned.length === 10) {
+    cleaned = '0' + cleaned;
+  }
+  if (cleaned.length === 11) {
+    return cleaned.slice(0, 3) + '-' + cleaned.slice(3, 7) + '-' + cleaned.slice(7);
+  } else if (cleaned.length === 10) {
+    return cleaned.slice(0, 3) + '-' + cleaned.slice(3, 6) + '-' + cleaned.slice(6);
+  }
+  return phone;
+}
+
 // Filter and download CSV client-side
 function downloadWinnersCSV() {
   SyncHelper.getWinners((winners) => {
@@ -245,12 +260,11 @@ function downloadWinnersCSV() {
     
     let filteredWinners = winners;
     if (startDateVal) {
-      const start = new Date(startDateVal);
+      const start = new Date(`${startDateVal}T00:00:00+09:00`);
       filteredWinners = filteredWinners.filter(w => new Date(w.timestamp) >= start);
     }
     if (endDateVal) {
-      const end = new Date(endDateVal);
-      end.setHours(23, 59, 59, 999);
+      const end = new Date(`${endDateVal}T23:59:59.999+09:00`);
       filteredWinners = filteredWinners.filter(w => new Date(w.timestamp) <= end);
     }
 
@@ -261,7 +275,7 @@ function downloadWinnersCSV() {
 
     // Generate CSV content
     const headers = ['사번', '전화번호', '상품명', '입력 시간'];
-    const rows = filteredWinners.map(w => [w.employeeId, w.phoneNumber, w.prize, w.timestampFormatted || w.timestamp]);
+    const rows = filteredWinners.map(w => [w.employeeId, formatPhoneNumber(w.phoneNumber), w.prize, w.timestampFormatted || w.timestamp]);
     const csvContent = [headers, ...rows].map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
     
     // Create Blob and trigger download
@@ -305,12 +319,11 @@ function loadWinnersCount() {
     
     let filteredWinners = winners;
     if (startDateVal) {
-      const start = new Date(startDateVal);
+      const start = new Date(`${startDateVal}T00:00:00+09:00`);
       filteredWinners = filteredWinners.filter(w => new Date(w.timestamp) >= start);
     }
     if (endDateVal) {
-      const end = new Date(endDateVal);
-      end.setHours(23, 59, 59, 999);
+      const end = new Date(`${endDateVal}T23:59:59.999+09:00`);
       filteredWinners = filteredWinners.filter(w => new Date(w.timestamp) <= end);
     }
     

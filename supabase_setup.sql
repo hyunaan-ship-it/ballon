@@ -19,5 +19,8 @@ CREATE POLICY "Allow anon read" ON public.winners
 CREATE POLICY "Allow anon insert" ON public.winners
   FOR INSERT WITH CHECK (true);
 
+CREATE POLICY "Allow anon delete" ON public.winners
+  FOR DELETE USING (true);
+
 -- Optional: index for faster filtering by account
 CREATE INDEX IF NOT EXISTS idx_winners_account_id ON public.winners (account_id, created_at);
