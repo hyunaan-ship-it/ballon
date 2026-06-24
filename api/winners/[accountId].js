@@ -65,7 +65,7 @@ export default async function handler(req, res) {
         phoneNumber: r.phone_number,
         prize: r.prize,
         timestamp: r.created_at,
-        timestampFormatted: new Date(r.created_at).toLocaleString('ko-KR')
+        timestampFormatted: new Date(r.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
       }));
       return res.status(200).json({ winners });
     } catch (err) {

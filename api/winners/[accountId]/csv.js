@@ -62,7 +62,7 @@ export default async function handler(req, res) {
       r.employee_id,
       formatPhoneNumber(r.phone_number),
       r.prize,
-      new Date(r.created_at).toLocaleString('ko-KR')
+      new Date(r.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
     ]);
     const csvContent = [headers, ...csvRows]
       .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))

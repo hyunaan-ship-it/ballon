@@ -275,7 +275,12 @@ function downloadWinnersCSV() {
 
     // Generate CSV content
     const headers = ['사번', '전화번호', '상품명', '입력 시간'];
-    const rows = filteredWinners.map(w => [w.employeeId, formatPhoneNumber(w.phoneNumber), w.prize, w.timestampFormatted || w.timestamp]);
+    const rows = filteredWinners.map(w => [
+      w.employeeId, 
+      formatPhoneNumber(w.phoneNumber), 
+      w.prize, 
+      w.timestamp ? new Date(w.timestamp).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : (w.timestampFormatted || '')
+    ]);
     const csvContent = [headers, ...rows].map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
     
     // Create Blob and trigger download
