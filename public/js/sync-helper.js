@@ -1,6 +1,18 @@
 // Synchronization Helper for Balloon Popping Game
 // Abstracts Socket.io, Firebase RTDB, and Supabase Realtime Broadcast behind a unified interface to support local, serverless, and peer-to-peer modes.
 
+function parsePrize(prizeStr) {
+  if (typeof prizeStr === 'string' && prizeStr.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(prizeStr);
+      if (parsed && (parsed.text !== undefined || parsed.image !== undefined)) {
+        return { text: parsed.text || '', image: parsed.image || '' };
+      }
+    } catch (e) {}
+  }
+  return { text: prizeStr || '', image: '' };
+}
+
 class BalloonSyncHelper {
   constructor() {
     this.mode = SYNC_CONFIG.mode;

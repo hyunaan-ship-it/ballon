@@ -110,6 +110,13 @@ function resetDartVisuals() {
   dartPin.style.transform = 'translateY(100px) scale(0)';
   dartPin.style.opacity = '0';
   
+  // Hide result image
+  const prizeImg = document.getElementById('result-prize-image');
+  if (prizeImg) {
+    prizeImg.style.display = 'none';
+    prizeImg.src = '';
+  }
+  
   // Force redraw
   void dartPin.offsetWidth;
   
@@ -349,19 +356,32 @@ submitWinnerBtn.addEventListener('click', () => {
 function handleThrowResult(data) {
   const resultTitle = document.getElementById('result-title');
   const resultDesc = document.getElementById('result-desc');
+  const prizeImg = document.getElementById('result-prize-image');
   
   // Re-enable pointer interactions when response arrives
   document.body.style.pointerEvents = 'auto';
   
   if (data.status === 'success') {
     triggerHaptic('hit');
-    currentPrize = data.prize;
+    
+    const parsed = parsePrize(data.prize);
+    currentPrize = parsed.text;
     
     // Show winner result overlay card
     setTimeout(() => {
       if (resultTitle) resultTitle.innerText = "🎯 다트 명중!";
       if (resultDesc) resultDesc.innerText = "획득한 경품은 바로...";
-      resultPrize.innerText = data.prize;
+      resultPrize.innerText = parsed.text;
+      
+      if (prizeImg) {
+        if (parsed.image) {
+          prizeImg.src = parsed.image;
+          prizeImg.style.display = 'block';
+        } else {
+          prizeImg.style.display = 'none';
+        }
+      }
+      
       resultOverlay.classList.add('active');
       
       // Show winner info form if prize requires winner info (checked by admin)
@@ -381,6 +401,7 @@ function handleThrowResult(data) {
       if (resultTitle) resultTitle.innerText = "❌ 조준 실패!";
       if (resultDesc) resultDesc.innerText = "아쉽게도 풍선을 비껴갔습니다.";
       resultPrize.innerText = "다시 조준해서 던져보세요!";
+      if (prizeImg) prizeImg.style.display = 'none';
       resultOverlay.classList.add('active');
       winnerInfoForm.style.display = 'none';
       resultConfirmBtn.style.display = 'block';

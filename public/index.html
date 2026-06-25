@@ -21,9 +21,7 @@
   <!-- Script loader for Socket.io -->
   <script>
     if (SYNC_CONFIG.mode === 'socket') {
-      const script = document.createElement('script');
-      script.src = '/socket.io/socket.io.js';
-      document.head.appendChild(script);
+      document.write('<script src="/socket.io/socket.io.js"><\/script>');
     }
   </script>
 </head>

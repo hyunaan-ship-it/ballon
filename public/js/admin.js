@@ -46,6 +46,34 @@ function buildGridStructure() {
     input.placeholder = `경품 내용을 입력하세요`;
     input.required = true;
     
+    // Copy-Paste Image Container
+    const imgContainer = document.createElement('div');
+    imgContainer.className = 'prize-image-container';
+    
+    const pasteZone = document.createElement('div');
+    pasteZone.className = 'prize-image-paste-zone';
+    pasteZone.tabIndex = 0;
+    pasteZone.innerText = '📋 이미지 붙여넣기 (Ctrl+V)';
+    
+    const previewDiv = document.createElement('div');
+    previewDiv.className = 'prize-image-preview';
+    previewDiv.style.display = 'none';
+    
+    const previewImg = document.createElement('img');
+    previewImg.id = `prize-image-preview-img-${i}`;
+    
+    const removeImgBtn = document.createElement('button');
+    removeImgBtn.className = 'remove-image-btn';
+    removeImgBtn.type = 'button';
+    removeImgBtn.innerText = '×';
+    removeImgBtn.title = '이미지 삭제';
+    
+    previewDiv.appendChild(previewImg);
+    previewDiv.appendChild(removeImgBtn);
+    
+    imgContainer.appendChild(pasteZone);
+    imgContainer.appendChild(previewDiv);
+    
     // Winner info checkbox
     const checkboxContainer = document.createElement('div');
     checkboxContainer.style.display = 'flex';
@@ -74,7 +102,73 @@ function buildGridStructure() {
     cell.appendChild(indexTag);
     cell.appendChild(statusTag);
     cell.appendChild(input);
+    cell.appendChild(imgContainer);
     cell.appendChild(checkboxContainer);
+    
+    // Paste handler for clipboard image with safety and canvas compression
+    function handleImagePaste(e) {
+      const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+      if (!clipboardData) return;
+      const items = clipboardData.items;
+      for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              const MAX_WIDTH = 300;
+              const MAX_HEIGHT = 300;
+              let width = img.width;
+              let height = img.height;
+              
+              if (width > height) {
+                if (width > MAX_WIDTH) {
+                  height = Math.round((height * MAX_WIDTH) / width);
+                  width = MAX_WIDTH;
+                }
+              } else {
+                if (height > MAX_HEIGHT) {
+                  width = Math.round((width * MAX_HEIGHT) / height);
+                  height = MAX_HEIGHT;
+                }
+              }
+              
+              canvas.width = width;
+              canvas.height = height;
+              ctx.drawImage(img, 0, 0, width, height);
+              
+              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+              cell.dataset.image = compressedBase64;
+              previewImg.src = compressedBase64;
+              previewDiv.style.display = 'flex';
+              pasteZone.style.display = 'none';
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(blob);
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+    
+    input.addEventListener('paste', handleImagePaste);
+    pasteZone.addEventListener('paste', handleImagePaste);
+    
+    pasteZone.addEventListener('click', () => {
+      pasteZone.focus();
+    });
+    
+    removeImgBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cell.removeAttribute('data-image');
+      previewImg.src = '';
+      previewDiv.style.display = 'none';
+      pasteZone.style.display = 'flex';
+    });
     
     adminPrizeGrid.appendChild(cell);
   }
@@ -88,8 +182,28 @@ function syncUIWithData() {
     const cell = document.getElementById(`admin-cell-${i}`);
     const checkbox = document.getElementById(`require-winner-info-${i}`);
     
+    const prizeData = parsePrize(currentPrizes[i]);
+    
     if (input) {
-      input.value = currentPrizes[i] || '';
+      input.value = prizeData.text || '';
+    }
+    
+    if (cell) {
+      const previewImg = document.getElementById(`prize-image-preview-img-${i}`);
+      const previewDiv = cell.querySelector('.prize-image-preview');
+      const pasteZone = cell.querySelector('.prize-image-paste-zone');
+      
+      if (prizeData.image) {
+        cell.dataset.image = prizeData.image;
+        if (previewImg) previewImg.src = prizeData.image;
+        if (previewDiv) previewDiv.style.display = 'flex';
+        if (pasteZone) pasteZone.style.display = 'none';
+      } else {
+        cell.removeAttribute('data-image');
+        if (previewImg) previewImg.src = '';
+        if (previewDiv) previewDiv.style.display = 'none';
+        if (pasteZone) pasteZone.style.display = 'flex';
+      }
     }
     
     if (checkbox) {
@@ -128,8 +242,29 @@ function syncUIWithData() {
 function applyPreset(presetArray) {
   for (let i = 0; i < 25; i++) {
     const input = document.getElementById(`prize-input-${i}`);
+    const cell = document.getElementById(`admin-cell-${i}`);
+    const parsed = parsePrize(presetArray[i]);
+    
     if (input) {
-      input.value = presetArray[i];
+      input.value = parsed.text;
+    }
+    
+    if (cell) {
+      const previewImg = document.getElementById(`prize-image-preview-img-${i}`);
+      const previewDiv = cell.querySelector('.prize-image-preview');
+      const pasteZone = cell.querySelector('.prize-image-paste-zone');
+      
+      if (parsed.image) {
+        cell.dataset.image = parsed.image;
+        if (previewImg) previewImg.src = parsed.image;
+        if (previewDiv) previewDiv.style.display = 'flex';
+        if (pasteZone) pasteZone.style.display = 'none';
+      } else {
+        cell.removeAttribute('data-image');
+        if (previewImg) previewImg.src = '';
+        if (previewDiv) previewDiv.style.display = 'none';
+        if (pasteZone) pasteZone.style.display = 'flex';
+      }
     }
   }
   // Soft highlight on inputs to show change
@@ -188,11 +323,20 @@ saveBtn.addEventListener('click', (e) => {
   let hasEmpty = false;
   
   for (let i = 0; i < 25; i++) {
-    const val = document.getElementById(`prize-input-${i}`).value.trim();
-    if (!val) {
+    const input = document.getElementById(`prize-input-${i}`);
+    const cell = document.getElementById(`admin-cell-${i}`);
+    const textVal = input ? input.value.trim() : "";
+    const imgVal = cell ? cell.dataset.image || "" : "";
+    
+    if (!textVal && !imgVal) {
       hasEmpty = true;
     }
-    updatedPrizes.push(val || "꽝");
+    
+    let prizeVal = textVal || "꽝";
+    if (imgVal) {
+      prizeVal = JSON.stringify({ text: textVal, image: imgVal });
+    }
+    updatedPrizes.push(prizeVal);
   }
   
   if (hasEmpty) {

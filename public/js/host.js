@@ -388,8 +388,26 @@ if (!accountId) {
           const nameEl = cell.querySelector('.prize-name');
           const iconEl = cell.querySelector('.prize-icon');
           if (nameEl && iconEl) {
-            nameEl.innerText = serverPrizes[i];
-            iconEl.innerText = getPrizeEmoji(serverPrizes[i]);
+            const parsed = parsePrize(serverPrizes[i]);
+            nameEl.innerText = parsed.text;
+            
+            let imgEl = cell.querySelector('.prize-img-element');
+            if (parsed.image) {
+              if (!imgEl) {
+                imgEl = document.createElement('img');
+                imgEl.className = 'prize-img-element';
+                iconEl.parentNode.insertBefore(imgEl, iconEl.nextSibling);
+              }
+              imgEl.src = parsed.image;
+              imgEl.style.display = 'block';
+              iconEl.style.display = 'none';
+            } else {
+              if (imgEl) {
+                imgEl.style.display = 'none';
+              }
+              iconEl.innerText = getPrizeEmoji(parsed.text);
+              iconEl.style.display = 'block';
+            }
           }
         }
       }
@@ -439,16 +457,31 @@ function renderBoard() {
     prizeTag.className = 'prize-index-tag';
     prizeTag.innerText = i + 1;
     
+    const parsed = parsePrize(prize);
+    
     const prizeIcon = document.createElement('div');
     prizeIcon.className = 'prize-icon';
-    prizeIcon.innerText = getPrizeEmoji(prize);
+    
+    const prizeImg = document.createElement('img');
+    prizeImg.className = 'prize-img-element';
+    prizeImg.style.display = 'none';
+    
+    if (parsed.image) {
+      prizeImg.src = parsed.image;
+      prizeImg.style.display = 'block';
+      prizeIcon.style.display = 'none';
+    } else {
+      prizeIcon.innerText = getPrizeEmoji(parsed.text);
+      prizeIcon.style.display = 'block';
+    }
     
     const prizeName = document.createElement('div');
     prizeName.className = 'prize-name';
-    prizeName.innerText = prize;
+    prizeName.innerText = parsed.text;
     
     prizeCard.appendChild(prizeTag);
     prizeCard.appendChild(prizeIcon);
+    prizeCard.appendChild(prizeImg);
     prizeCard.appendChild(prizeName);
     
     const balloonWrapper = document.createElement('div');
@@ -618,9 +651,31 @@ function executePop(index, prize) {
   const unpoppedCount = serverPopped.filter(p => !p).length;
   poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / 25`;
   
+  const parsed = parsePrize(prize);
+  
   setTimeout(() => {
-    modalPrizeEmoji.innerText = getPrizeEmoji(prize);
-    modalPrizeText.innerText = prize;
+    modalPrizeText.innerText = parsed.text;
+    
+    // Custom Image display inside the circle
+    let modalPrizeImg = document.getElementById('modal-prize-image');
+    if (!modalPrizeImg) {
+      modalPrizeImg = document.createElement('img');
+      modalPrizeImg.id = 'modal-prize-image';
+      modalPrizeImg.className = 'modal-prize-image-element';
+    }
+    
+    if (parsed.image) {
+      modalPrizeImg.src = parsed.image;
+      modalPrizeImg.style.display = 'block';
+      modalPrizeEmoji.innerHTML = '';
+      modalPrizeEmoji.appendChild(modalPrizeImg);
+      modalPrizeEmoji.style.fontSize = '0'; // Hide fallback emoji font spacing
+    } else {
+      modalPrizeImg.style.display = 'none';
+      modalPrizeEmoji.innerHTML = getPrizeEmoji(parsed.text);
+      modalPrizeEmoji.style.fontSize = ''; // Restore default emoji font size
+    }
+    
     celebrationOverlay.classList.add('active');
   }, 450);
 }
@@ -677,6 +732,9 @@ function buildEditorInputs() {
     wrapper.style.border = '1px solid var(--glass-border)';
     wrapper.style.borderRadius = '8px';
     wrapper.style.padding = '8px';
+    wrapper.id = `modal-cell-wrapper-${i}`;
+    
+    const parsed = parsePrize(serverPrizes[i]);
     
     const label = document.createElement('span');
     label.innerText = `${i + 1}번 풍선`;
@@ -687,7 +745,7 @@ function buildEditorInputs() {
     const input = document.createElement('input');
     input.type = 'text';
     input.id = `modal-prize-input-${i}`;
-    input.value = serverPrizes[i] || '';
+    input.value = parsed.text || '';
     input.style.width = '100%';
     input.style.background = 'rgba(0,0,0,0.3)';
     input.style.border = '1px solid var(--glass-border)';
@@ -700,8 +758,107 @@ function buildEditorInputs() {
     input.onfocus = () => { input.style.borderColor = 'var(--accent-cyan)'; };
     input.onblur = () => { input.style.borderColor = 'var(--glass-border)'; };
     
+    // Copy-Paste Image Container
+    const imgContainer = document.createElement('div');
+    imgContainer.className = 'prize-image-container';
+    
+    const pasteZone = document.createElement('div');
+    pasteZone.className = 'prize-image-paste-zone';
+    pasteZone.tabIndex = 0;
+    pasteZone.innerText = '📋 이미지 Ctrl+V';
+    
+    const previewDiv = document.createElement('div');
+    previewDiv.className = 'prize-image-preview';
+    previewDiv.style.display = 'none';
+    
+    const previewImg = document.createElement('img');
+    previewImg.id = `modal-prize-preview-img-${i}`;
+    
+    const removeImgBtn = document.createElement('button');
+    removeImgBtn.className = 'remove-image-btn';
+    removeImgBtn.type = 'button';
+    removeImgBtn.innerText = '×';
+    removeImgBtn.title = '이미지 삭제';
+    
+    previewDiv.appendChild(previewImg);
+    previewDiv.appendChild(removeImgBtn);
+    
+    imgContainer.appendChild(pasteZone);
+    imgContainer.appendChild(previewDiv);
+    
     wrapper.appendChild(label);
     wrapper.appendChild(input);
+    wrapper.appendChild(imgContainer);
+    
+    if (parsed.image) {
+      wrapper.dataset.image = parsed.image;
+      previewImg.src = parsed.image;
+      previewDiv.style.display = 'flex';
+      pasteZone.style.display = 'none';
+    }
+    
+    // Paste Event Handlers with safety and canvas compression
+    function handleImagePaste(e) {
+      const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+      if (!clipboardData) return;
+      const items = clipboardData.items;
+      for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              const MAX_WIDTH = 300;
+              const MAX_HEIGHT = 300;
+              let width = img.width;
+              let height = img.height;
+              
+              if (width > height) {
+                if (width > MAX_WIDTH) {
+                  height = Math.round((height * MAX_WIDTH) / width);
+                  width = MAX_WIDTH;
+                }
+              } else {
+                if (height > MAX_HEIGHT) {
+                  width = Math.round((width * MAX_HEIGHT) / height);
+                  height = MAX_HEIGHT;
+                }
+              }
+              
+              canvas.width = width;
+              canvas.height = height;
+              ctx.drawImage(img, 0, 0, width, height);
+              
+              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+              wrapper.dataset.image = compressedBase64;
+              previewImg.src = compressedBase64;
+              previewDiv.style.display = 'flex';
+              pasteZone.style.display = 'none';
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(blob);
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+    
+    input.addEventListener('paste', handleImagePaste);
+    pasteZone.addEventListener('paste', handleImagePaste);
+    pasteZone.addEventListener('click', () => { pasteZone.focus(); });
+    
+    removeImgBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      wrapper.removeAttribute('data-image');
+      previewImg.src = '';
+      previewDiv.style.display = 'none';
+      pasteZone.style.display = 'flex';
+    });
+    
     modalInputsGrid.appendChild(wrapper);
   }
 }
@@ -732,8 +889,18 @@ editPresetBtn.addEventListener('click', () => {
   ];
   for (let i = 0; i < 25; i++) {
     const input = document.getElementById(`modal-prize-input-${i}`);
+    const wrapper = document.getElementById(`modal-cell-wrapper-${i}`);
     if (input) {
       input.value = balancedPreset[i];
+    }
+    if (wrapper) {
+      wrapper.removeAttribute('data-image');
+      const previewImg = document.getElementById(`modal-prize-preview-img-${i}`);
+      const previewDiv = wrapper.querySelector('.prize-image-preview');
+      const pasteZone = wrapper.querySelector('.prize-image-paste-zone');
+      if (previewImg) previewImg.src = '';
+      if (previewDiv) previewDiv.style.display = 'none';
+      if (pasteZone) pasteZone.style.display = 'flex';
     }
   }
 });
@@ -742,7 +909,15 @@ editSaveBtn.addEventListener('click', () => {
   const updatedPrizes = [];
   for (let i = 0; i < 25; i++) {
     const input = document.getElementById(`modal-prize-input-${i}`);
-    updatedPrizes.push(input ? input.value.trim() || '꽝' : '꽝');
+    const wrapper = document.getElementById(`modal-cell-wrapper-${i}`);
+    const textVal = input ? input.value.trim() || '꽝' : '꽝';
+    const imgVal = wrapper ? wrapper.dataset.image || '' : '';
+    
+    let prizeVal = textVal;
+    if (imgVal) {
+      prizeVal = JSON.stringify({ text: textVal, image: imgVal });
+    }
+    updatedPrizes.push(prizeVal);
   }
   SyncHelper.updatePrizes(updatedPrizes);
   editPrizesOverlay.classList.remove('active');

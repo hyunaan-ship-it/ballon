@@ -264,3 +264,81 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+/* Image Paste and Preview Styles */
+.prize-image-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.prize-image-paste-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 8px 4px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.prize-image-paste-zone:hover,
+.prize-image-paste-zone:focus {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 242, 254, 0.05);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.prize-image-preview {
+  position: relative;
+  width: 100%;
+  height: 80px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prize-image-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.remove-image-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 23, 68, 0.85);
+  color: white;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+  padding: 0;
+  line-height: 1;
+}
+
+.remove-image-btn:hover {
+  background: #ff1744;
+}

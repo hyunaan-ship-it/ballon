@@ -493,3 +493,99 @@
   box-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
 }
 
+/* Custom Image support for Balloon board and modal */
+.prize-img-element {
+  max-width: 80%;
+  max-height: 48px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.modal-prize-image-element {
+  max-width: 85%;
+  max-height: 85%;
+  border-radius: 8px;
+  display: block;
+  object-fit: contain;
+}
+
+/* Also styling for host modal editor image upload/paste */
+.prize-image-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.prize-image-paste-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 6px 2px;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.prize-image-paste-zone:hover,
+.prize-image-paste-zone:focus {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 242, 254, 0.05);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.prize-image-preview {
+  position: relative;
+  width: 100%;
+  height: 55px;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prize-image-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.remove-image-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 23, 68, 0.85);
+  color: white;
+  border: none;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+  padding: 0;
+  line-height: 1;
+}
+
+.remove-image-btn:hover {
+  background: #ff1744;
+}
+

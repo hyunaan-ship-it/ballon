@@ -18,9 +18,7 @@
   <!-- Script loader for Socket.io -->
   <script>
     if (SYNC_CONFIG.mode === 'socket') {
-      const script = document.createElement('script');
-      script.src = '/socket.io/socket.io.js';
-      document.head.appendChild(script);
+      document.write('<script src="/socket.io/socket.io.js"><\/script>');
     }
   </script>
 </head>
@@ -121,11 +119,12 @@
     </div>
   </div>
 
-  <!-- Success / Result Indicator Overlay -->
+    <!-- Success / Result Indicator Overlay -->
   <div class="feedback-overlay glass-panel" id="result-overlay">
     <div class="feedback-title" id="result-title">🎯 다트 명중!</div>
     <div id="result-desc" style="font-size: 0.95rem; color: var(--text-secondary); margin-top: 8px;">획득한 경품은 바로...</div>
     <div class="feedback-prize" id="result-prize">스타벅스 커피 쿠폰</div>
+    <img id="result-prize-image" style="display: none; max-width: 100%; max-height: 140px; margin: 15px auto 0; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); object-fit: contain;">
     
     <!-- Winner Info Form (shown only on prize win) -->
     <div id="winner-info-form" style="display: none; margin-top: 20px; width: 100%;">
