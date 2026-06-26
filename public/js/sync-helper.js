@@ -438,6 +438,10 @@ class BalloonSyncHelper {
               clearTimeout(this.fallbackTimer);
               this.fallbackTimer = null;
             }
+            if (payload) {
+              const localKey = `balloon_state_acc_${this.accountId}`;
+              localStorage.setItem(localKey, JSON.stringify(payload));
+            }
             if (this.onInitCallback) {
               this.onInitCallback(payload);
             }
@@ -445,6 +449,10 @@ class BalloonSyncHelper {
         })
         .on('broadcast', { event: 'state-updated' }, ({ payload }) => {
           console.log("[Supabase] State update broadcast received:", payload);
+          if (payload) {
+            const localKey = `balloon_state_acc_${this.accountId}`;
+            localStorage.setItem(localKey, JSON.stringify(payload));
+          }
           if (this.onStateUpdateCallback) {
             this.onStateUpdateCallback(payload);
           }
@@ -537,7 +545,50 @@ class BalloonSyncHelper {
           console.log(`[SyncHelper] Supabase Realtime subscribed in role: ${this.role}`);
           await this.channel.track({ role: this.role });
 
-          if (this.role === 'host') {
+          // Try to load state from API first
+          let apiLoadedState = null;
+          let apiStatus = null;
+          try {
+            const res = await fetch(`/api/board-state/${this.accountId}`);
+            apiStatus = res.status;
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.prizes && data.popped) {
+                apiLoadedState = {
+                  prizes: data.prizes,
+                  popped: data.popped,
+                  requireWinnerInfo: data.requireWinnerInfo || Array(25).fill(false)
+                };
+                console.log(`[SyncHelper] Successfully loaded board state from database for Account ${this.accountId}`);
+              }
+            }
+          } catch (err) {
+            console.warn("[SyncHelper] Failed to fetch board state from API:", err);
+          }
+
+          if (apiStatus === 200 || apiStatus === 404) {
+            // API connection is functional. Clear safety timeout immediately to prevent local fallback.
+            if (this.fallbackTimer) {
+              clearTimeout(this.fallbackTimer);
+              this.fallbackTimer = null;
+            }
+          }
+
+          if (apiLoadedState) {
+            const localKey = `balloon_state_acc_${this.accountId}`;
+            localStorage.setItem(localKey, JSON.stringify(apiLoadedState));
+
+            if (this.onInitCallback) {
+              this.onInitCallback({
+                prizes: apiLoadedState.prizes,
+                popped: apiLoadedState.popped,
+                requireWinnerInfo: apiLoadedState.requireWinnerInfo,
+                mobileUrl: window.location.origin + `/mobile.html?room=${this.room}&account=${this.accountId}`
+              });
+            }
+          } else if (apiStatus === 404) {
+            // Database is online, but no board state is saved yet.
+            // Let's initialize with default/local state and save it to the DB.
             const localKey = `balloon_state_acc_${this.accountId}`;
             let state = JSON.parse(localStorage.getItem(localKey)) || {
               prizes: defaultPrizes,
@@ -549,6 +600,13 @@ class BalloonSyncHelper {
             }
             localStorage.setItem(localKey, JSON.stringify(state));
 
+            // Write initial state to database
+            fetch(`/api/board-state/${this.accountId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(state)
+            }).catch(err => console.warn("[SyncHelper] Failed to initialize board state in DB:", err));
+
             if (this.onInitCallback) {
               this.onInitCallback({
                 prizes: state.prizes,
@@ -558,12 +616,35 @@ class BalloonSyncHelper {
               });
             }
           } else {
-            // Send join init-request
-            this.channel.send({
-              type: 'broadcast',
-              event: 'request-init',
-              payload: { role: this.role }
-            });
+            // API request failed or returned other error. Fall back to old local/broadcast logic
+            if (this.role === 'host') {
+              const localKey = `balloon_state_acc_${this.accountId}`;
+              let state = JSON.parse(localStorage.getItem(localKey)) || {
+                prizes: defaultPrizes,
+                popped: Array(25).fill(false),
+                requireWinnerInfo: Array(25).fill(false)
+              };
+              if (!state.requireWinnerInfo) {
+                state.requireWinnerInfo = Array(25).fill(false);
+              }
+              localStorage.setItem(localKey, JSON.stringify(state));
+
+              if (this.onInitCallback) {
+                this.onInitCallback({
+                  prizes: state.prizes,
+                  popped: state.popped,
+                  requireWinnerInfo: state.requireWinnerInfo,
+                  mobileUrl: window.location.origin + `/mobile.html?room=${this.room}&account=${this.accountId}`
+                });
+              }
+            } else {
+              // Send join init-request to host
+              this.channel.send({
+                type: 'broadcast',
+                event: 'request-init',
+                payload: { role: this.role }
+              });
+            }
           }
         } else {
           console.warn("[SyncHelper] Supabase channel subscribe failure:", status);
@@ -576,6 +657,24 @@ class BalloonSyncHelper {
     } catch (e) {
       console.warn("[SyncHelper] Supabase client creation failed:", e);
       this._fallbackToLocal(e.message);
+    }
+  }
+
+  async _saveBoardStateSupabase(state) {
+    if (this.mode !== 'supabase') return;
+    try {
+      await fetch(`/api/board-state/${this.accountId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prizes: state.prizes,
+          popped: state.popped,
+          requireWinnerInfo: state.requireWinnerInfo || Array(25).fill(false)
+        })
+      });
+      console.log(`[SyncHelper] Saved board state to Supabase DB for Account ${this.accountId}`);
+    } catch (err) {
+      console.warn(`[SyncHelper] Failed to save board state to Supabase DB:`, err);
     }
   }
 
@@ -651,6 +750,7 @@ class BalloonSyncHelper {
     // Success Hit!
     state.popped[targetIndex] = true;
     localStorage.setItem(localKey, JSON.stringify(state));
+    this._saveBoardStateSupabase(state);
 
     // Broadcast new popped state
     this.channel.send({
@@ -855,6 +955,7 @@ class BalloonSyncHelper {
         }
       }
       localStorage.setItem(localKey, JSON.stringify(state));
+      this._saveBoardStateSupabase(state);
       
       if (this.mode === 'supabase') {
         this.channel.send({
@@ -899,6 +1000,7 @@ class BalloonSyncHelper {
       if (state && state.popped) {
         state.popped[index] = !state.popped[index];
         localStorage.setItem(localKey, JSON.stringify(state));
+        this._saveBoardStateSupabase(state);
         
         if (this.mode === 'supabase') {
           this.channel.send({
@@ -931,6 +1033,7 @@ class BalloonSyncHelper {
       if (state && !state.popped[index]) {
         state.popped[index] = true;
         localStorage.setItem(localKey, JSON.stringify(state));
+        this._saveBoardStateSupabase(state);
         
         if (this.mode === 'supabase') {
           this.channel.send({
@@ -978,6 +1081,7 @@ class BalloonSyncHelper {
       let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
       state.prizes = updatedPrizes;
       localStorage.setItem(localKey, JSON.stringify(state));
+      this._saveBoardStateSupabase(state);
       
       if (this.mode === 'supabase') {
         this.channel.send({
@@ -1009,6 +1113,7 @@ class BalloonSyncHelper {
       state.prizes = updatedPrizes;
       state.requireWinnerInfo = requireWinnerInfo;
       localStorage.setItem(localKey, JSON.stringify(state));
+      this._saveBoardStateSupabase(state);
       
       if (this.mode === 'supabase') {
         this.channel.send({
@@ -1279,6 +1384,7 @@ class BalloonSyncHelper {
       let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
       state.requireWinnerInfo = requireWinnerInfo;
       localStorage.setItem(localKey, JSON.stringify(state));
+      this._saveBoardStateSupabase(state);
       
       if (this.mode === 'supabase') {
         this.channel.send({

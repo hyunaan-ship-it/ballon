@@ -180,6 +180,42 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// API endpoint to get board state
+app.get('/api/board-state/:accountId', (req, res) => {
+  const accountId = req.params.accountId || '1';
+  const state = accountsState[accountId];
+  if (state) {
+    res.json({
+      prizes: state.prizes,
+      popped: state.popped,
+      requireWinnerInfo: state.requireWinnerInfo || Array(25).fill(false)
+    });
+  } else {
+    res.status(404).json({ status: 'not_found' });
+  }
+});
+
+// API endpoint to save board state
+app.post('/api/board-state/:accountId', (req, res) => {
+  const accountId = req.params.accountId || '1';
+  const { prizes, popped, requireWinnerInfo } = req.body;
+  if (!prizes || !popped) {
+    return res.status(400).json({ status: 'error', message: 'prizes and popped are required' });
+  }
+  
+  accountsState[accountId] = {
+    prizes: prizes,
+    popped: popped,
+    requireWinnerInfo: requireWinnerInfo || Array(25).fill(false)
+  };
+  saveGameState();
+  
+  // Broadcast to other socket clients
+  io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', accountsState[accountId]);
+  
+  res.json({ status: 'success' });
+});
+
 // API endpoint to submit winner info via POST
 app.post('/api/winners/:accountId', (req, res) => {
   const accountId = req.params.accountId || '1';
