@@ -439,6 +439,13 @@ class BalloonSyncHelper {
               this.fallbackTimer = null;
             }
             if (payload) {
+              try {
+                if (typeof payload.prizes === 'string') payload.prizes = JSON.parse(payload.prizes);
+                if (typeof payload.popped === 'string') payload.popped = JSON.parse(payload.popped);
+                if (typeof payload.requireWinnerInfo === 'string') payload.requireWinnerInfo = JSON.parse(payload.requireWinnerInfo);
+              } catch (e) {
+                console.warn("[SyncHelper] Failed to parse init payload:", e);
+              }
               const localKey = `balloon_state_acc_${this.accountId}`;
               localStorage.setItem(localKey, JSON.stringify(payload));
             }
@@ -450,6 +457,13 @@ class BalloonSyncHelper {
         .on('broadcast', { event: 'state-updated' }, ({ payload }) => {
           console.log("[Supabase] State update broadcast received:", payload);
           if (payload) {
+            try {
+              if (typeof payload.prizes === 'string') payload.prizes = JSON.parse(payload.prizes);
+              if (typeof payload.popped === 'string') payload.popped = JSON.parse(payload.popped);
+              if (typeof payload.requireWinnerInfo === 'string') payload.requireWinnerInfo = JSON.parse(payload.requireWinnerInfo);
+            } catch (e) {
+              console.warn("[SyncHelper] Failed to parse broadcast payload:", e);
+            }
             const localKey = `balloon_state_acc_${this.accountId}`;
             localStorage.setItem(localKey, JSON.stringify(payload));
           }
@@ -554,10 +568,20 @@ class BalloonSyncHelper {
             if (res.ok) {
               const data = await res.json();
               if (data && data.prizes && data.popped) {
+                let parsedPrizes = data.prizes;
+                let parsedPopped = data.popped;
+                let parsedRequire = data.requireWinnerInfo || Array(25).fill(false);
+                try {
+                  if (typeof parsedPrizes === 'string') parsedPrizes = JSON.parse(parsedPrizes);
+                  if (typeof parsedPopped === 'string') parsedPopped = JSON.parse(parsedPopped);
+                  if (typeof parsedRequire === 'string') parsedRequire = JSON.parse(parsedRequire);
+                } catch (e) {
+                  console.warn("[SyncHelper] Failed to parse apiLoadedState fields:", e);
+                }
                 apiLoadedState = {
-                  prizes: data.prizes,
-                  popped: data.popped,
-                  requireWinnerInfo: data.requireWinnerInfo || Array(25).fill(false)
+                  prizes: parsedPrizes,
+                  popped: parsedPopped,
+                  requireWinnerInfo: parsedRequire
                 };
                 console.log(`[SyncHelper] Successfully loaded board state from database for Account ${this.accountId}`);
               }
@@ -1138,6 +1162,13 @@ class BalloonSyncHelper {
   }
 
   throwDart(intensity, extraData = {}, onResult) {
+    const now = Date.now();
+    if (this._lastClientThrowTime && (now - this._lastClientThrowTime < 2000)) {
+      console.warn("[SyncHelper] Blocked client double-throw invocation.");
+      return;
+    }
+    this._lastClientThrowTime = now;
+
     if (this.mode === 'socket') {
       this.socket.emit('mobile-throw', { intensity: intensity, ...extraData });
       this.socket.once('throw-result', (data) => {

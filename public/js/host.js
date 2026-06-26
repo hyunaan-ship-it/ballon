@@ -283,6 +283,10 @@ let serverPrizes = [
   "꽝 (아쉬워요!)", "스타벅스 커피", "꽝 (아쉬워요!)", "꽝 (아쉬워요!)", "대박! 에어팟 프로"
 ];
 let serverPopped = Array(25).fill(false);
+let lastAnimatedPopIndex = null;
+let lastAnimatedPopTime = 0;
+let lastAnimatedMissIndex = null;
+let lastAnimatedMissTime = 0;
 
 const gridEl = document.getElementById('balloon-grid');
 const mobileCountVal = document.getElementById('mobile-count-val');
@@ -421,11 +425,25 @@ if (!accountId) {
       celebrationOverlay.classList.remove('active');
     },
     onPopTrigger: (data) => {
+      if (lastAnimatedPopIndex === data.index && (Date.now() - lastAnimatedPopTime < 2000)) {
+        console.log(`[Host] Blocked duplicate pop trigger animation for cell ${data.index}`);
+        return;
+      }
+      lastAnimatedPopIndex = data.index;
+      lastAnimatedPopTime = Date.now();
+
       animateDartThrow(data.index, () => {
         executePop(data.index, data.prize);
       });
     },
     onMissTrigger: (data) => {
+      if (lastAnimatedMissIndex === data.index && (Date.now() - lastAnimatedMissTime < 2000)) {
+        console.log(`[Host] Blocked duplicate miss trigger animation for cell ${data.index}`);
+        return;
+      }
+      lastAnimatedMissIndex = data.index;
+      lastAnimatedMissTime = Date.now();
+
       animateDartThrow(data.index, () => {}, true);
     },
     onMobileCount: (count) => {

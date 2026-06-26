@@ -446,13 +446,21 @@ if (!accountId) {
       badgeText.innerText = `연결됨 (계정 ${accountId})`;
       console.log(`Mobile SyncHelper successfully established connection for Account ${accountId}`);
       if (data && data.popped) {
-        mobilePoppedState = data.popped;
+        let popped = data.popped;
+        if (typeof popped === 'string') {
+          try { popped = JSON.parse(popped); } catch (e) {}
+        }
+        mobilePoppedState = Array.isArray(popped) ? popped : Array(25).fill(false);
         updateAimVisualizer();
       }
     },
     onStateUpdate: (data) => {
       if (data && data.popped) {
-        mobilePoppedState = data.popped;
+        let popped = data.popped;
+        if (typeof popped === 'string') {
+          try { popped = JSON.parse(popped); } catch (e) {}
+        }
+        mobilePoppedState = Array.isArray(popped) ? popped : Array(25).fill(false);
         updateAimVisualizer();
       }
     },
