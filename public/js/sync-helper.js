@@ -171,11 +171,11 @@ class BalloonSyncHelper {
       return;
     }
 
-    // Set a safety timeout of 3.5 seconds
+    // Set a safety timeout of 12 seconds (provides enough time for iOS permission dialog and cold starts)
     this.fallbackTimer = setTimeout(() => {
-      console.warn("[SyncHelper] Firebase RTDB connection timed out (3.5s). Falling back to local sandbox storage.");
-      this._fallbackToLocal("Firebase connection timeout (3.5s)");
-    }, 3500);
+      console.warn("[SyncHelper] Firebase RTDB connection timed out (12s). Falling back to local sandbox storage.");
+      this._fallbackToLocal("Firebase connection timeout (12s)");
+    }, 12000);
 
     try {
       if (firebase.apps.length === 0) {
@@ -377,12 +377,12 @@ class BalloonSyncHelper {
       return;
     }
 
-    // Set safety response timeout for Mobile/Admin clients to detect if Host is open
+    // Set safety response timeout for Mobile/Admin clients to detect if Host is open (12 seconds to accommodate iOS permission prompt)
     if (this.role !== 'host') {
       this.fallbackTimer = setTimeout(() => {
-        console.warn("[SyncHelper] Supabase Host response timed out (3.5s). Falling back to local sandbox.");
-        this._fallbackToLocal("Supabase Host connection timeout (3.5s)");
-      }, 3500);
+        console.warn("[SyncHelper] Supabase Host response timed out (12s). Falling back to local sandbox.");
+        this._fallbackToLocal("Supabase Host connection timeout (12s)");
+      }, 12000);
     }
 
     try {
