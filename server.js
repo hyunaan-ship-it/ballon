@@ -8,6 +8,12 @@ const os = require('os');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000,
+    skipMiddlewares: true,
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
@@ -80,8 +86,8 @@ let accountsState = {
 };
 
 // Cooldown to prevent duplicate throw triggers on the server side
-const lastAccountThrowTime = {};
-const SERVER_THROW_COOLDOWN = 1800; // 1.8 seconds minimum between throws per account
+const lastSocketThrowTime = {};
+const SERVER_THROW_COOLDOWN = 1800; // 1.8 seconds minimum between throws per socket
 
 // Winners data structure
 let winnersData = {
@@ -396,6 +402,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const accountId = socket.accountId;
     console.log(`Socket disconnected: ${socket.id} (Account: ${accountId})`);
+    delete lastSocketThrowTime[socket.id];
     if (accountId) {
       const activeMobiles = io.sockets.adapter.rooms.get(`mobile-room-${accountId}`)?.size || 0;
       io.to(`host-room-${accountId}`).emit('mobile-disconnected', { count: activeMobiles });
@@ -475,14 +482,14 @@ io.on('connection', (socket) => {
     const state = accountsState[accountId];
     if (!state) return;
 
-    // Server-side duplicate throw mitigation
+    // Server-side duplicate throw mitigation per socket
     const now = Date.now();
-    const lastThrow = lastAccountThrowTime[accountId] || 0;
+    const lastThrow = lastSocketThrowTime[socket.id] || 0;
     if (now - lastThrow < SERVER_THROW_COOLDOWN) {
-      console.log(`[Server] Blocked duplicate throw request for Account ${accountId}. Time diff: ${now - lastThrow}ms`);
+      console.log(`[Server] Blocked duplicate throw request for Socket ${socket.id}. Time diff: ${now - lastThrow}ms`);
       return;
     }
-    lastAccountThrowTime[accountId] = now;
+    lastSocketThrowTime[socket.id] = now;
 
     console.log(`Dart thrown from mobile: ${socket.id} on Account ${accountId} with intensity:`, data.intensity || 1, 'tilt:', data.tilt);
 
@@ -530,7 +537,10 @@ io.on('connection', (socket) => {
       for (const idx of unpoppedIndices) {
         const r = Math.floor(idx / 5);
         const c = idx % 5;
-        const distSq = Math.pow(row - r, 2) + Math.pow(col - c, 2);
+        // Make top-row balloons (rows 0 and 1) easier to hit by reducing the perceived vertical distance to them
+        const rowDiff = row - r;
+        const weightedRowDiff = r < 2 ? rowDiff * 0.5 : rowDiff;
+        const distSq = Math.pow(weightedRowDiff, 2) + Math.pow(col - c, 2);
         if (distSq < minDistanceSq) {
           minDistanceSq = distSq;
           closestIndex = idx;

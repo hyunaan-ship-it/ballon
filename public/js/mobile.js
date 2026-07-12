@@ -17,6 +17,14 @@ let touchStartTime = 0;
 let deviceTilt = { x: 0, y: 0 };
 let currentPrize = null;
 
+// Neutral orientation state (calibrated for phone holding angle)
+let neutralBeta = parseFloat(localStorage.getItem('calibrated_beta')) || 55;
+let neutralGamma = parseFloat(localStorage.getItem('calibrated_gamma')) || 0;
+let currentBeta = 55;
+let currentGamma = 0;
+let tiltHistory = [];
+const TILT_HISTORY_LIMIT = 10;
+
 // DOM Elements
 const connectionBadge = document.getElementById('connection-badge');
 const badgeText = document.getElementById('badge-text');
@@ -75,7 +83,7 @@ function updatePowerBar(percent) {
 }
 
 // Trigger standard throw action and sync to server
-function triggerThrow(intensity = 1.0) {
+function triggerThrow(intensity = 1.0, isSwipe = false) {
   if (!canThrow) return;
   
   const now = Date.now();
@@ -95,8 +103,11 @@ function triggerThrow(intensity = 1.0) {
   dartPin.style.transform = 'translateY(-150vh) rotate(-45deg) scale(0.2)';
   dartPin.style.opacity = '0';
   
+  // Use historical tilt from ~200ms ago for motion throw, current tilt for swipe throw
+  const throwingTilt = (isSwipe || tiltHistory.length === 0) ? deviceTilt : tiltHistory[0];
+  
   // Sync with unified SyncHelper layer (include tilt data)
-  SyncHelper.throwDart(parseFloat(intensity.toFixed(2)), { tilt: deviceTilt }, (data) => {
+  SyncHelper.throwDart(parseFloat(intensity.toFixed(2)), { tilt: throwingTilt }, (data) => {
     handleThrowResult(data);
   });
   
@@ -155,7 +166,7 @@ function handleDeviceMotion(event) {
   // Trigger a launch if force crosses heavy threshold
   if (magnitude > shakeThreshold) {
     const intensity = Math.min(2.5, magnitude / shakeThreshold);
-    triggerThrow(intensity);
+    triggerThrow(intensity, false);
   }
 }
 
@@ -197,20 +208,26 @@ function handleDeviceOrientation(event) {
   const gamma = event.gamma || 0;
   const beta = event.beta || 0;
   
-  // We define the neutral holding state:
-  // - left-to-right tilt (gamma) = 0 degrees
-  // - front-to-back tilt (beta) = 55 degrees (natural holding slope)
-  // A sensitivity range of +/- 20 degrees for gamma, and +/- 25 degrees for beta
-  const sensitivityX = 20;
-  const sensitivityY = 25;
+  // Track current orientation values for calibration
+  currentBeta = beta;
+  currentGamma = gamma;
   
-  const normalizedX = gamma / sensitivityX;
-  // Invert Y: tilting phone more vertical (beta increases) aims higher (towards row 0, so negative tilt.y)
-  const normalizedY = -(beta - 55) / sensitivityY;
+  // Dynamic neutral holding state based on calibration
+  const sensitivityX = 20;
+  const sensitivityY = 18; // Adjusted from 25 to 18 to make vertical aiming easier (difficulty adjust)
+  
+  const normalizedX = (gamma - neutralGamma) / sensitivityX;
+  const normalizedY = -(beta - neutralBeta) / sensitivityY;
   
   // Clamp to -1 to 1
   deviceTilt.x = Math.max(-1, Math.min(1, normalizedX));
   deviceTilt.y = Math.max(-1, Math.min(1, normalizedY));
+  
+  // Push to history buffer to counteract wrist rotation
+  tiltHistory.push({ x: deviceTilt.x, y: deviceTilt.y });
+  if (tiltHistory.length > TILT_HISTORY_LIMIT) {
+    tiltHistory.shift();
+  }
   
   updateAimVisualizer();
 }
@@ -272,7 +289,7 @@ dartPin.addEventListener('touchend', (e) => {
   if (dy < -70 && dt < 450) {
     const speed = Math.abs(dy) / dt; // velocity in pixels/ms
     const intensity = Math.min(2.5, speed * 0.4);
-    triggerThrow(intensity);
+    triggerThrow(intensity, true);
   } else {
     // Snap back elastically if release wasn't solid
     dartPin.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
@@ -437,6 +454,32 @@ if (!accountId) {
   connectionBadge.className = 'connection-badge disconnected';
   badgeText.innerText = '연결 시도 중...';
   
+  // Calibrate button event listener
+  const calibrateBtn = document.getElementById('calibrate-btn');
+  if (calibrateBtn) {
+    calibrateBtn.addEventListener('click', () => {
+      neutralBeta = currentBeta;
+      neutralGamma = currentGamma;
+      localStorage.setItem('calibrated_beta', neutralBeta);
+      localStorage.setItem('calibrated_gamma', neutralGamma);
+      
+      triggerHaptic('reset');
+      
+      const originalText = calibrateBtn.innerHTML;
+      calibrateBtn.innerText = '✅ 보정 완료!';
+      calibrateBtn.style.borderColor = '#00e676';
+      calibrateBtn.style.color = '#00e676';
+      
+      setTimeout(() => {
+        calibrateBtn.innerHTML = originalText;
+        calibrateBtn.style.borderColor = 'rgba(0, 242, 254, 0.25)';
+        calibrateBtn.style.color = 'var(--accent-cyan)';
+      }, 1200);
+      
+      console.log(`Calibrated center: neutralBeta = ${neutralBeta}, neutralGamma = ${neutralGamma}`);
+    });
+  }
+  
   // Initialize Unified Sync Layer!
   SyncHelper.init({
     role: 'mobile',
@@ -473,6 +516,14 @@ if (!accountId) {
     onPrizeConfirmed: () => {
       resultOverlay.classList.remove('active');
       resetDartVisuals();
+    },
+    onDisconnect: (reason) => {
+      connectionBadge.className = 'connection-badge disconnected';
+      badgeText.innerText = '연결 끊김 (재연결 중...)';
+    },
+    onConnect: () => {
+      connectionBadge.className = 'connection-badge';
+      badgeText.innerText = `연결됨 (계정 ${accountId})`;
     }
   });
 }

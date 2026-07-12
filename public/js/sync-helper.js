@@ -45,7 +45,7 @@ class BalloonSyncHelper {
     this._winnersStoreLoaded = false;
   }
 
-  init({ role, accountId, onInit, onStateUpdate, onReset, onPopTrigger, onMissTrigger, onMobileCount, onPrizeConfirmed, onNewWinner, onWinnersCleared }) {
+  init({ role, accountId, onInit, onStateUpdate, onReset, onPopTrigger, onMissTrigger, onMobileCount, onPrizeConfirmed, onNewWinner, onWinnersCleared, onDisconnect, onConnect }) {
     this.role = role;
     this.accountId = String(accountId || '1');
     this.room = getOrGenerateRoomId();
@@ -58,6 +58,8 @@ class BalloonSyncHelper {
     this.onPrizeConfirmedCallback = onPrizeConfirmed;
     this.onNewWinnerCallback = onNewWinner;
     this.onWinnersClearedCallback = onWinnersCleared || null;
+    this.onDisconnectCallback = onDisconnect || null;
+    this.onConnectCallback = onConnect || null;
 
     console.log(`[SyncHelper] Initializing in ${this.mode.toUpperCase()} mode for Account ${this.accountId}, Room ${this.room}`);
 
@@ -82,6 +84,14 @@ class BalloonSyncHelper {
 
       this.socket.on('connect', () => {
         console.log(`[SyncHelper] Socket connected: ${this.socket.id}`);
+        // If we were in fallback mode, restore socket mode!
+        if (this.mode === 'local-fallback' && SYNC_CONFIG.mode === 'socket') {
+          this.mode = 'socket';
+          console.log("[SyncHelper] Socket reconnected! Restoring socket mode.");
+        }
+        if (this.onConnectCallback) {
+          this.onConnectCallback();
+        }
         if (this.role === 'host') {
           this.socket.emit('join-host', { accountId: this.accountId });
         } else if (this.role === 'mobile') {
@@ -91,9 +101,18 @@ class BalloonSyncHelper {
         }
       });
 
+      this.socket.on('disconnect', (reason) => {
+        console.warn(`[SyncHelper] Socket disconnected: ${reason}`);
+        if (this.onDisconnectCallback) {
+          this.onDisconnectCallback(reason);
+        }
+      });
+
       this.socket.on('connect_error', (err) => {
-        console.warn("[SyncHelper] Socket connection failed, using local sandbox fallback:", err.message);
-        this._fallbackToLocal("Socket connection failure");
+        console.warn("[SyncHelper] Socket connection failed (retrying in background):", err.message);
+        if (this.onDisconnectCallback) {
+          this.onDisconnectCallback('connect_error');
+        }
       });
 
       this.socket.on('init-state', (data) => {
@@ -300,9 +319,11 @@ class BalloonSyncHelper {
         throwRespRef.on('value', (snapshot) => {
           const resp = snapshot.val();
           if (resp && resp.timestamp > this.lastProcessedResponseTime) {
-            this.lastProcessedResponseTime = resp.timestamp;
-            if (this.onThrowResponseCallback) {
-              this.onThrowResponseCallback(resp);
+            if (resp.socketId === this.socketId) {
+              this.lastProcessedResponseTime = resp.timestamp;
+              if (this.onThrowResponseCallback) {
+                this.onThrowResponseCallback(resp);
+              }
             }
           }
         });
@@ -504,8 +525,10 @@ class BalloonSyncHelper {
         .on('broadcast', { event: 'throw-response' }, ({ payload }) => {
           if (this.role === 'mobile') {
             console.log("[Supabase] Mobile received throw response:", payload);
-            if (this.onThrowResponseCallback) {
-              this.onThrowResponseCallback(payload);
+            if (payload && payload.socketId === this.socketId) {
+              if (this.onThrowResponseCallback) {
+                this.onThrowResponseCallback(payload);
+              }
             }
           }
         })
@@ -708,14 +731,16 @@ class BalloonSyncHelper {
     let state = JSON.parse(localStorage.getItem(localKey));
     if (!state) return;
 
-    // Supabase duplicate throw mitigation
+    // Supabase duplicate throw mitigation per device
     const now = Date.now();
-    if (!this.lastSupabaseThrowTime) this.lastSupabaseThrowTime = 0;
-    if (now - this.lastSupabaseThrowTime < 1800) {
-      console.log(`[Supabase] Blocked duplicate throw request. Time diff: ${now - this.lastSupabaseThrowTime}ms`);
+    if (!this.lastSupabaseDeviceThrowTime) this.lastSupabaseDeviceThrowTime = {};
+    const deviceId = req.socketId || 'default';
+    const lastThrow = this.lastSupabaseDeviceThrowTime[deviceId] || 0;
+    if (now - lastThrow < 1800) {
+      console.log(`[Supabase] Blocked duplicate throw request for device ${deviceId}.`);
       return;
     }
-    this.lastSupabaseThrowTime = now;
+    this.lastSupabaseDeviceThrowTime[deviceId] = now;
 
     const unpoppedIndices = [];
     for (let i = 0; i < state.popped.length; i++) {
@@ -726,7 +751,7 @@ class BalloonSyncHelper {
       this.channel.send({
         type: 'broadcast',
         event: 'throw-response',
-        payload: { status: 'error', message: '모든 풍선이 이미 터졌습니다!' }
+        payload: { status: 'error', message: '모든 풍선이 이미 터졌습니다!', socketId: req.socketId }
       });
       return;
     }
@@ -745,7 +770,9 @@ class BalloonSyncHelper {
       for (const idx of unpoppedIndices) {
         const r = Math.floor(idx / 5);
         const c = idx % 5;
-        const distSq = Math.pow(row - r, 2) + Math.pow(col - c, 2);
+        const rowDiff = row - r;
+        const weightedRowDiff = r < 2 ? rowDiff * 0.5 : rowDiff;
+        const distSq = Math.pow(weightedRowDiff, 2) + Math.pow(col - c, 2);
         if (distSq < minDistanceSq) {
           minDistanceSq = distSq;
           closestIndex = idx;
@@ -766,7 +793,7 @@ class BalloonSyncHelper {
       this.channel.send({
         type: 'broadcast',
         event: 'throw-response',
-        payload: { status: 'miss', index: targetIndex }
+        payload: { status: 'miss', index: targetIndex, socketId: req.socketId }
       });
       return;
     }
@@ -800,7 +827,8 @@ class BalloonSyncHelper {
         status: 'success',
         index: targetIndex,
         prize: state.prizes[targetIndex],
-        requireWinnerInfo: state.requireWinnerInfo ? state.requireWinnerInfo[targetIndex] : false
+        requireWinnerInfo: state.requireWinnerInfo ? state.requireWinnerInfo[targetIndex] : false,
+        socketId: req.socketId
       }
     });
   }
@@ -870,14 +898,16 @@ class BalloonSyncHelper {
       const state = snapshot.val();
       if (!state) return;
 
-      // Firebase duplicate throw mitigation
+      // Firebase duplicate throw mitigation per device
       const now = Date.now();
-      if (!this.lastFirebaseThrowTime) this.lastFirebaseThrowTime = 0;
-      if (now - this.lastFirebaseThrowTime < 1800) {
-        console.log(`[Firebase] Blocked duplicate throw request.`);
+      if (!this.lastFirebaseDeviceThrowTime) this.lastFirebaseDeviceThrowTime = {};
+      const deviceId = req.socketId || 'default';
+      const lastThrow = this.lastFirebaseDeviceThrowTime[deviceId] || 0;
+      if (now - lastThrow < 1800) {
+        console.log(`[Firebase] Blocked duplicate throw request for device ${deviceId}.`);
         return;
       }
-      this.lastFirebaseThrowTime = now;
+      this.lastFirebaseDeviceThrowTime[deviceId] = now;
 
       const unpoppedIndices = [];
       for (let i = 0; i < state.popped.length; i++) {
@@ -885,7 +915,7 @@ class BalloonSyncHelper {
       }
 
       if (unpoppedIndices.length === 0) {
-        this.respondToFirebaseThrow({ status: 'error', message: '모든 풍선이 이미 터졌습니다!' });
+        this.respondToFirebaseThrow({ status: 'error', message: '모든 풍선이 이미 터졌습니다!' }, req.socketId);
         return;
       }
 
@@ -901,7 +931,9 @@ class BalloonSyncHelper {
         for (const idx of unpoppedIndices) {
           const r = Math.floor(idx / 5);
           const c = idx % 5;
-          const distSq = Math.pow(row - r, 2) + Math.pow(col - c, 2);
+          const rowDiff = row - r;
+          const weightedRowDiff = r < 2 ? rowDiff * 0.5 : rowDiff;
+          const distSq = Math.pow(weightedRowDiff, 2) + Math.pow(col - c, 2);
           if (distSq < minDistanceSq) {
             minDistanceSq = distSq;
             closestIndex = idx;
@@ -916,7 +948,7 @@ class BalloonSyncHelper {
         if (this.onMissTriggerCallback) {
           this.onMissTriggerCallback({ index: targetIndex, intensity: req.intensity || 1 });
         }
-        this.respondToFirebaseThrow({ status: 'miss', index: targetIndex });
+        this.respondToFirebaseThrow({ status: 'miss', index: targetIndex }, req.socketId);
         return;
       }
 
@@ -936,14 +968,15 @@ class BalloonSyncHelper {
         index: targetIndex,
         prize: state.prizes[targetIndex],
         requireWinnerInfo: state.requireWinnerInfo ? state.requireWinnerInfo[targetIndex] : false
-      });
+      }, req.socketId);
     });
   }
 
-  respondToFirebaseThrow(result) {
+  respondToFirebaseThrow(result, socketId) {
     const throwRespRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/throw_response`);
     throwRespRef.set({
       ...result,
+      socketId: socketId,
       timestamp: Date.now()
     });
   }
@@ -1198,7 +1231,9 @@ class BalloonSyncHelper {
         for (const idx of unpopped) {
           const r = Math.floor(idx / 5);
           const c = idx % 5;
-          const distSq = Math.pow(row - r, 2) + Math.pow(col - c, 2);
+          const rowDiff = row - r;
+          const weightedRowDiff = r < 2 ? rowDiff * 0.5 : rowDiff;
+          const distSq = Math.pow(weightedRowDiff, 2) + Math.pow(col - c, 2);
           if (distSq < minDistanceSq) {
             minDistanceSq = distSq;
             closestIndex = idx;
@@ -1229,7 +1264,7 @@ class BalloonSyncHelper {
       this.channel.send({
         type: 'broadcast',
         event: 'throw-request',
-        payload: { intensity: intensity, ...extraData }
+        payload: { intensity: intensity, socketId: this.socketId, ...extraData }
       });
     } else {
       this.onThrowResponseCallback = (data) => {
@@ -1239,6 +1274,7 @@ class BalloonSyncHelper {
       throwReqRef.set({
         intensity: intensity,
         tilt: extraData.tilt || null,
+        socketId: this.socketId,
         timestamp: Date.now()
       });
     }

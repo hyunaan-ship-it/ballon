@@ -451,6 +451,19 @@ if (!accountId) {
     },
     onPrizeConfirmed: () => {
       celebrationOverlay.classList.remove('active');
+    },
+    onDisconnect: (reason) => {
+      console.warn("[Host] Disconnected from server:", reason);
+      if (mobileCountVal) {
+        mobileCountVal.style.color = '#ff1744';
+        mobileCountVal.innerText = '서버 연결 끊김 (재연결 중...)';
+      }
+    },
+    onConnect: () => {
+      console.log("[Host] Connected/Reconnected to server.");
+      if (mobileCountVal) {
+        mobileCountVal.style.color = '';
+      }
     }
   });
 }

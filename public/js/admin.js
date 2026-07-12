@@ -550,6 +550,28 @@ if (!accountId) {
     },
     onWinnersCleared: () => {
       winnersCountDiv.innerText = '당첨자: 0명';
+    },
+    onDisconnect: (reason) => {
+      console.warn("[Admin] Disconnected from server:", reason);
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerText = '⚠️ 연결 끊김 - 저장 불가';
+        saveBtn.style.backgroundColor = '#ff1744';
+      }
+      if (opResetBtn) opResetBtn.disabled = true;
+      if (opShuffleBtn) opShuffleBtn.disabled = true;
+      if (clearWinnersBtn) clearWinnersBtn.disabled = true;
+    },
+    onConnect: () => {
+      console.log("[Admin] Connected/Reconnected to server.");
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerText = '💾 경품 및 설정 저장 & 동기화';
+        saveBtn.style.backgroundColor = '';
+      }
+      if (opResetBtn) opResetBtn.disabled = false;
+      if (opShuffleBtn) opShuffleBtn.disabled = false;
+      if (clearWinnersBtn) clearWinnersBtn.disabled = false;
     }
   });
 }

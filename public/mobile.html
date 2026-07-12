@@ -44,14 +44,19 @@
 
   <div class="mobile-container">
     <!-- Top Header -->
-    <header class="mobile-header">
+    <header class="mobile-header" style="flex-wrap: wrap; gap: 8px;">
       <div style="display: flex; flex-direction: column;">
         <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Dart Controller</span>
         <span style="font-size: 1.1rem; font-weight: 800; color: white;">다트 던지기</span>
       </div>
-      <div id="connection-badge" class="connection-badge disconnected">
-        <span class="dot" style="background-color: currentColor;"></span>
-        <span id="badge-text">연결 대기중</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button id="calibrate-btn" class="btn-secondary" style="padding: 6px 12px; font-size: 0.75rem; border-radius: 20px; background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.25); color: var(--accent-cyan); font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+          🎯 조준 보정
+        </button>
+        <div id="connection-badge" class="connection-badge disconnected">
+          <span class="dot" style="background-color: currentColor;"></span>
+          <span id="badge-text">연결 대기중</span>
+        </div>
       </div>
     </header>
 
