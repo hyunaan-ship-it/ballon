@@ -593,7 +593,7 @@ class BalloonSyncHelper {
               if (data && data.prizes && data.popped) {
                 let parsedPrizes = data.prizes;
                 let parsedPopped = data.popped;
-                let parsedRequire = data.requireWinnerInfo || Array(25).fill(false);
+                let parsedRequire = data.requireWinnerInfo || Array(parsedPrizes.length).fill(false);
                 try {
                   if (typeof parsedPrizes === 'string') parsedPrizes = JSON.parse(parsedPrizes);
                   if (typeof parsedPopped === 'string') parsedPopped = JSON.parse(parsedPopped);
@@ -640,10 +640,11 @@ class BalloonSyncHelper {
             let state = JSON.parse(localStorage.getItem(localKey)) || {
               prizes: defaultPrizes,
               popped: Array(25).fill(false),
-              requireWinnerInfo: Array(25).fill(false)
+              requireWinnerInfo: Array(25).fill(false),
+              gridSize: 5
             };
             if (!state.requireWinnerInfo) {
-              state.requireWinnerInfo = Array(25).fill(false);
+              state.requireWinnerInfo = Array(state.prizes.length).fill(false);
             }
             localStorage.setItem(localKey, JSON.stringify(state));
 
@@ -669,10 +670,11 @@ class BalloonSyncHelper {
               let state = JSON.parse(localStorage.getItem(localKey)) || {
                 prizes: defaultPrizes,
                 popped: Array(25).fill(false),
-                requireWinnerInfo: Array(25).fill(false)
+                requireWinnerInfo: Array(25).fill(false),
+                gridSize: 5
               };
               if (!state.requireWinnerInfo) {
-                state.requireWinnerInfo = Array(25).fill(false);
+                state.requireWinnerInfo = Array(state.prizes.length).fill(false);
               }
               localStorage.setItem(localKey, JSON.stringify(state));
 
@@ -716,7 +718,8 @@ class BalloonSyncHelper {
         body: JSON.stringify({
           prizes: state.prizes,
           popped: state.popped,
-          requireWinnerInfo: state.requireWinnerInfo || Array(25).fill(false)
+          requireWinnerInfo: state.requireWinnerInfo || Array(state.prizes.length).fill(false),
+          gridSize: state.gridSize || Math.sqrt(state.prizes.length) || 5
         })
       });
       console.log(`[SyncHelper] Saved board state to Supabase DB for Account ${this.accountId}`);
@@ -759,17 +762,18 @@ class BalloonSyncHelper {
     const isMiss = (req.intensity < 0.6) || (Math.random() < 0.15);
     
     // Find target index based on 2D tilt coordinates mapping
+    const gridSize = state.gridSize || Math.sqrt(state.prizes.length) || 5;
     let targetIndex;
     if (req.tilt && (req.tilt.x !== undefined || req.tilt.y !== undefined)) {
-      const col = Math.max(0, Math.min(4, Math.floor(((req.tilt.x + 1) / 2) * 5)));
-      const row = Math.max(0, Math.min(4, Math.floor(((req.tilt.y + 1) / 2) * 5)));
-      const tiltedIndex = row * 5 + col;
+      const col = Math.max(0, Math.min(gridSize - 1, Math.floor(((req.tilt.x + 1) / 2) * gridSize)));
+      const row = Math.max(0, Math.min(gridSize - 1, Math.floor(((req.tilt.y + 1) / 2) * gridSize)));
+      const tiltedIndex = row * gridSize + col;
       
       let closestIndex = unpoppedIndices[0];
       let minDistanceSq = Infinity;
       for (const idx of unpoppedIndices) {
-        const r = Math.floor(idx / 5);
-        const c = idx % 5;
+        const r = Math.floor(idx / gridSize);
+        const c = idx % gridSize;
         const rowDiff = row - r;
         const weightedRowDiff = r < 2 ? rowDiff * 0.5 : rowDiff;
         const distSq = Math.pow(weightedRowDiff, 2) + Math.pow(col - c, 2);
@@ -873,11 +877,12 @@ class BalloonSyncHelper {
       state = {
         prizes: defaultPrizes,
         popped: Array(25).fill(false),
-        requireWinnerInfo: Array(25).fill(false)
+        requireWinnerInfo: Array(25).fill(false),
+        gridSize: 5
       };
       localStorage.setItem(localKey, JSON.stringify(state));
     } else if (!state.requireWinnerInfo) {
-      state.requireWinnerInfo = Array(25).fill(false);
+      state.requireWinnerInfo = Array(state.prizes.length).fill(false);
       localStorage.setItem(localKey, JSON.stringify(state));
     }
 
@@ -921,16 +926,17 @@ class BalloonSyncHelper {
 
       const isMiss = (req.intensity < 0.6) || (Math.random() < 0.15);
       
+      const gridSize = state.gridSize || Math.sqrt(state.prizes.length) || 5;
       let targetIndex;
       if (req.tilt && (req.tilt.x !== undefined || req.tilt.y !== undefined)) {
-        const col = Math.max(0, Math.min(4, Math.floor(((req.tilt.x + 1) / 2) * 5)));
-        const row = Math.max(0, Math.min(4, Math.floor(((req.tilt.y + 1) / 2) * 5)));
+        const col = Math.max(0, Math.min(gridSize - 1, Math.floor(((req.tilt.x + 1) / 2) * gridSize)));
+        const row = Math.max(0, Math.min(gridSize - 1, Math.floor(((req.tilt.y + 1) / 2) * gridSize)));
         
         let closestIndex = unpoppedIndices[0];
         let minDistanceSq = Infinity;
         for (const idx of unpoppedIndices) {
-          const r = Math.floor(idx / 5);
-          const c = idx % 5;
+          const r = Math.floor(idx / gridSize);
+          const c = idx % gridSize;
           const rowDiff = row - r;
           const weightedRowDiff = r < 2 ? rowDiff * 0.5 : rowDiff;
           const distSq = Math.pow(weightedRowDiff, 2) + Math.pow(col - c, 2);
@@ -1004,7 +1010,7 @@ class BalloonSyncHelper {
     } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
       const localKey = `balloon_state_acc_${this.accountId}`;
       let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
-      state.popped = Array(25).fill(false);
+      state.popped = Array(state.prizes.length).fill(false);
       if (options.shuffle) {
         for (let i = state.prizes.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -1034,7 +1040,7 @@ class BalloonSyncHelper {
       accountRef.child('state').once('value', (snapshot) => {
         const state = snapshot.val();
         if (state) {
-          state.popped = Array(25).fill(false);
+          state.popped = Array(state.prizes.length).fill(false);
           if (options.shuffle) {
             for (let i = state.prizes.length - 1; i > 0; i--) {
               const j = Math.floor(Math.random() * (i + 1));
@@ -1221,16 +1227,17 @@ class BalloonSyncHelper {
       }
       const isMiss = (intensity < 0.6) || (Math.random() < 0.15);
       
+      const gridSize = state.gridSize || Math.sqrt(state.prizes.length) || 5;
       let targetIndex;
       if (extraData.tilt && (extraData.tilt.x !== undefined || extraData.tilt.y !== undefined)) {
-        const col = Math.max(0, Math.min(4, Math.floor(((extraData.tilt.x + 1) / 2) * 5)));
-        const row = Math.max(0, Math.min(4, Math.floor(((extraData.tilt.y + 1) / 2) * 5)));
+        const col = Math.max(0, Math.min(gridSize - 1, Math.floor(((extraData.tilt.x + 1) / 2) * gridSize)));
+        const row = Math.max(0, Math.min(gridSize - 1, Math.floor(((extraData.tilt.y + 1) / 2) * gridSize)));
         
         let closestIndex = unpopped[0];
         let minDistanceSq = Infinity;
         for (const idx of unpopped) {
-          const r = Math.floor(idx / 5);
-          const c = idx % 5;
+          const r = Math.floor(idx / gridSize);
+          const c = idx % gridSize;
           const rowDiff = row - r;
           const weightedRowDiff = r < 2 ? rowDiff * 0.5 : rowDiff;
           const distSq = Math.pow(weightedRowDiff, 2) + Math.pow(col - c, 2);
@@ -1281,6 +1288,17 @@ class BalloonSyncHelper {
   }
 
   submitWinnerInfo(employeeId, phoneNumber, prize, onResult) {
+    // Client-side duplicate check (for fast validation)
+    const cleanPhone = (p) => String(p).replace(/[^0-9]/g, '');
+    const alreadyExists = this._winnersStore.some(
+      w => (w.employeeId && w.employeeId.trim() === employeeId.trim()) ||
+           (w.phoneNumber && cleanPhone(w.phoneNumber) === cleanPhone(phoneNumber))
+    );
+    if (alreadyExists) {
+      onResult({ status: 'error', message: '이미 등록된 사번 또는 전화번호입니다. 중복 제출이 제한됩니다.' });
+      return;
+    }
+
     const now = new Date();
     const winnerInfo = {
       employeeId,
@@ -1302,8 +1320,8 @@ class BalloonSyncHelper {
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
-          // Also update local in-memory store so admin's getWinners() reflects it immediately
-          this._winnersStore.push(winnerInfo);
+          // Don't add to local store here - server will broadcast via socket.io 'new-winner' event
+          // which will be received by all clients including the admin
           onResult({ status: 'success' });
         } else {
           onResult({ status: 'error', message: data.message });
@@ -1506,6 +1524,74 @@ class BalloonSyncHelper {
       const localKey = `winners_list_acc_${this.accountId}`;
       localStorage.removeItem(localKey);
       callback({ status: 'success' });
+    }
+  }
+
+  updateGridSize(size) {
+    if (this.mode === 'socket') {
+      this.socket.emit('admin-change-grid-size', size);
+    } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
+      const localKey = `balloon_state_acc_${this.accountId}`;
+      let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
+      state.gridSize = size;
+      const targetLen = size * size;
+      if (state.prizes.length < targetLen) {
+        while (state.prizes.length < targetLen) {
+          state.prizes.push("꽝 (아쉬워요!)");
+          state.popped.push(false);
+          if (!state.requireWinnerInfo) state.requireWinnerInfo = [];
+          state.requireWinnerInfo.push(false);
+        }
+      } else if (state.prizes.length > targetLen) {
+        state.prizes = state.prizes.slice(0, targetLen);
+        state.popped = state.popped.slice(0, targetLen);
+        if (state.requireWinnerInfo) {
+          state.requireWinnerInfo = state.requireWinnerInfo.slice(0, targetLen);
+        }
+      }
+      localStorage.setItem(localKey, JSON.stringify(state));
+      this._saveBoardStateSupabase(state);
+      
+      if (this.mode === 'supabase') {
+        this.channel.send({
+          type: 'broadcast',
+          event: 'state-updated',
+          payload: state
+        });
+        this.channel.send({
+          type: 'broadcast',
+          event: 'board-reset',
+          payload: {}
+        });
+      } else {
+        if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
+        if (this.onResetCallback) this.onResetCallback();
+      }
+    } else {
+      const accountRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}`);
+      accountRef.child('state').once('value', (snapshot) => {
+        const state = snapshot.val();
+        if (state) {
+          state.gridSize = size;
+          const targetLen = size * size;
+          if (state.prizes.length < targetLen) {
+            while (state.prizes.length < targetLen) {
+              state.prizes.push("꽝 (아쉬워요!)");
+              state.popped.push(false);
+              if (!state.requireWinnerInfo) state.requireWinnerInfo = [];
+              state.requireWinnerInfo.push(false);
+            }
+          } else if (state.prizes.length > targetLen) {
+            state.prizes = state.prizes.slice(0, targetLen);
+            state.popped = state.popped.slice(0, targetLen);
+            if (state.requireWinnerInfo) {
+              state.requireWinnerInfo = state.requireWinnerInfo.slice(0, targetLen);
+            }
+          }
+          accountRef.child('state').set(state);
+          accountRef.child('reset_trigger').set({ timestamp: Date.now() });
+        }
+      });
     }
   }
 

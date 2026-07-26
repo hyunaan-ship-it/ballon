@@ -219,7 +219,7 @@
   box-shadow: var(--glow-cyan);
 }
 
-.pill-btn {
+.pill-btn, .grid-size-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--glass-border);
   color: var(--text-secondary);
@@ -231,12 +231,12 @@
   transition: var(--transition-fast);
 }
 
-.pill-btn:hover {
+.pill-btn:hover, .grid-size-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
 }
 
-.pill-btn.active {
+.pill-btn.active, .grid-size-btn.active {
   background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
   color: white;
   border-color: transparent;

@@ -73,11 +73,37 @@
         </div>
       </div>
 
+      <!-- Audio Settings Panel -->
+      <div class="status-panel glass-panel" style="padding: 15px; margin-top: 10px;">
+        <span style="font-size: 0.85rem; font-weight: 700; color: var(--accent-cyan); display: block; margin-bottom: 12px; letter-spacing: 0.5px;">🔊 사운드 설정 (Audio Options)</span>
+        
+        <!-- BGM Control -->
+        <div style="margin-bottom: 15px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">배경음악 (BGM)</span>
+            <button id="bgm-mute-btn" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 0.75rem; padding: 0;">🔊 켜짐</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="range" id="bgm-volume-slider" min="0" max="1" step="0.05" value="0.4" style="flex: 1; accent-color: var(--accent-cyan); cursor: pointer;">
+            <span id="bgm-volume-text" style="font-size: 0.72rem; color: var(--text-muted); width: 25px; text-align: right;">40%</span>
+          </div>
+        </div>
+        
+        <!-- POP Control -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">효과음 (SFX)</span>
+            <button id="sfx-mute-btn" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 0.75rem; padding: 0;">🔊 켜짐</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="range" id="sfx-volume-slider" min="0" max="1" step="0.05" value="0.9" style="flex: 1; accent-color: var(--accent-cyan); cursor: pointer;">
+            <span id="sfx-volume-text" style="font-size: 0.72rem; color: var(--text-muted); width: 25px; text-align: right;">90%</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Control buttons -->
       <div class="control-panel">
-        <button id="sound-btn" class="btn-secondary" style="width: 100%; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-          🔊 사운드: 켜짐
-        </button>
         <button id="edit-prizes-btn" class="btn-secondary" style="width: 100%; margin-bottom: 8px; justify-content: center; background: rgba(0, 242, 254, 0.05); border-color: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; font-weight: 600;">
           ⚙️ 실시간 경품 편집
         </button>

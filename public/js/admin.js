@@ -24,8 +24,11 @@ const presetBlankBtn = document.getElementById('preset-blank');
 // Build 25 modular input cards
 function buildGridStructure() {
   adminPrizeGrid.innerHTML = '';
+  const size = currentPrizes.length || 25;
+  const gridSize = Math.sqrt(size) || 5;
+  adminPrizeGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
   
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < size; i++) {
     const cell = document.createElement('div');
     cell.className = 'prize-input-cell';
     cell.id = `admin-cell-${i}`;
@@ -176,7 +179,10 @@ function buildGridStructure() {
 
 // Update inputs and badges with server data
 function syncUIWithData() {
-  for (let i = 0; i < 25; i++) {
+  const size = currentPrizes.length;
+  updateSectionTitle();
+
+  for (let i = 0; i < size; i++) {
     const input = document.getElementById(`prize-input-${i}`);
     const statusTag = document.getElementById(`status-tag-${i}`);
     const cell = document.getElementById(`admin-cell-${i}`);
@@ -233,17 +239,40 @@ function syncUIWithData() {
   }
   
   if (toggleAllWinnerInfo) {
-    const allChecked = currentRequireWinnerInfo.length === 25 && currentRequireWinnerInfo.every(val => val === true);
+    const allChecked = currentRequireWinnerInfo.length === size && currentRequireWinnerInfo.every(val => val === true);
     toggleAllWinnerInfo.checked = allChecked;
+  }
+}
+
+function updateSectionTitle() {
+  const size = currentPrizes.length || 25;
+  const gridSize = Math.sqrt(size) || 5;
+  const titleEl = document.querySelector('.prize-edit-panel h2');
+  if (titleEl) {
+    titleEl.innerText = `🎈 ${gridSize} x ${gridSize} 풍선별 경품 편집`;
+  }
+  
+  // Also toggle active class on size buttons
+  const btn5 = document.getElementById('grid-size-5x5-btn');
+  const btn6 = document.getElementById('grid-size-6x6-btn');
+  if (btn5 && btn6) {
+    if (gridSize === 5) {
+      btn5.classList.add('active');
+      btn6.classList.remove('active');
+    } else {
+      btn6.classList.add('active');
+      btn5.classList.remove('active');
+    }
   }
 }
 
 // Preset Generators
 function applyPreset(presetArray) {
-  for (let i = 0; i < 25; i++) {
+  const size = currentPrizes.length;
+  for (let i = 0; i < size; i++) {
     const input = document.getElementById(`prize-input-${i}`);
     const cell = document.getElementById(`admin-cell-${i}`);
-    const parsed = parsePrize(presetArray[i]);
+    const parsed = parsePrize(presetArray[i] || "꽝 (아쉬워요!)");
     
     if (input) {
       input.value = parsed.text;
@@ -277,41 +306,64 @@ function applyPreset(presetArray) {
   });
 }
 
-// Preset Distributions
-const balancedPreset = [
-  "스타벅스 커피", "문화상품권 1만원", "꽝 (아쉬워요!)", "치킨 쿠폰", "꽝 (아쉬워요!)",
-  "꽝 (아쉬워요!)", "베스킨라빈스 싱글", "스타벅스 커피", "꽝 (아쉬워요!)", "문화상품권 1만원",
-  "신세계 상품권 3만원", "꽝 (아쉬워요!)", "꽝 (아쉬워요!)", "스타벅스 커피", "꽝 (아쉬워요!)",
-  "치킨 쿠폰", "꽝 (아쉬워요!)", "문화상품권 1만원", "꽝 (아쉬워요!)", "베스킨라빈스 싱글",
-  "꽝 (아쉬워요!)", "스타벅스 커피", "꽝 (아쉬워요!)", "꽝 (아쉬워요!)", "대박! 에어팟 프로"
-];
+function getBalancedPreset(size) {
+  const basePrizes = [
+    "스타벅스 커피", "문화상품권 1만원", "치킨 쿠폰", "베스킨라빈스 싱글", "신세계 상품권 3만원", "대박! 에어팟 프로"
+  ];
+  const balanced = [];
+  for (let i = 0; i < size; i++) {
+    if (i % 6 === 0) {
+      balanced.push(basePrizes[0]);
+    } else if (i % 8 === 1) {
+      balanced.push(basePrizes[1]);
+    } else if (i % 12 === 2) {
+      balanced.push(basePrizes[2]);
+    } else if (i % 9 === 3) {
+      balanced.push(basePrizes[3]);
+    } else if (i % 18 === 4) {
+      balanced.push(basePrizes[4]);
+    } else if (i === size - 1) {
+      balanced.push(basePrizes[5]);
+    } else {
+      balanced.push("꽝 (아쉬워요!)");
+    }
+  }
+  return balanced;
+}
 
-const generousPreset = [
-  "스타벅스 커피", "문화상품권 1만원", "베스킨라빈스 싱글", "치킨 쿠폰", "신세계 3만원",
-  "스타벅스 커피", "문화상품권 1만원", "영화 관람권", "치킨 쿠폰", "베스킨라빈스 싱글",
-  "신세계 5만원", "스타벅스 커피", "문화상품권 1만원", "영화 관람권", "치킨 쿠폰",
-  "베스킨라빈스 싱글", "스타벅스 커피", "문화상품권 1만원", "영화 관람권", "치킨 쿠폰",
-  "편의점 5천원권", "스타벅스 커피", "베스킨라빈스 싱글", "편의점 5천원권", "대박! 에어팟 프로"
-];
-
-const blankPreset = Array(25).fill("꽝 (아쉬워요!)");
+function getGenerousPreset(size) {
+  const basePrizes = [
+    "스타벅스 커피", "문화상품권 1만원", "베스킨라빈스 싱글", "치킨 쿠폰", "신세계 3만원",
+    "영화 관람권", "신세계 5만원", "편의점 5천원권", "대박! 에어팟 프로"
+  ];
+  const generous = [];
+  for (let i = 0; i < size; i++) {
+    if (i === size - 1) {
+      generous.push(basePrizes[8]);
+    } else {
+      const idx = i % 8;
+      generous.push(basePrizes[idx]);
+    }
+  }
+  return generous;
+}
 
 // Register Preset Button actions
 presetBalancedBtn.addEventListener('click', () => {
   if (confirm("균형잡힌 이벤트 프리셋을 입력창에 채우시겠습니까? (최종 적용하려면 경품 저장 버튼을 눌러주세요)")) {
-    applyPreset(balancedPreset);
+    applyPreset(getBalancedPreset(currentPrizes.length));
   }
 });
 
 presetGenerousBtn.addEventListener('click', () => {
   if (confirm("꽝이 없는 푸짐한 프리셋을 입력창에 채우시겠습니까? (최종 적용하려면 경품 저장 버튼을 눌러주세요)")) {
-    applyPreset(generousPreset);
+    applyPreset(getGenerousPreset(currentPrizes.length));
   }
 });
 
 presetBlankBtn.addEventListener('click', () => {
   if (confirm("모든 경품을 '꽝 (아쉬워요!)'으로 비우시겠습니까? (최종 적용하려면 경품 저장 버튼을 눌러주세요)")) {
-    applyPreset(blankPreset);
+    applyPreset(Array(currentPrizes.length).fill("꽝 (아쉬워요!)"));
   }
 });
 
@@ -321,8 +373,9 @@ saveBtn.addEventListener('click', (e) => {
   
   const updatedPrizes = [];
   let hasEmpty = false;
+  const size = currentPrizes.length;
   
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < size; i++) {
     const input = document.getElementById(`prize-input-${i}`);
     const cell = document.getElementById(`admin-cell-${i}`);
     const textVal = input ? input.value.trim() : "";
@@ -346,7 +399,7 @@ saveBtn.addEventListener('click', (e) => {
   }
 
   const requireWinnerInfo = [];
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < size; i++) {
     const checkbox = document.getElementById(`require-winner-info-${i}`);
     requireWinnerInfo.push(checkbox ? checkbox.checked : false);
   }
@@ -364,7 +417,8 @@ opResetBtn.addEventListener('click', () => {
 });
 
 opShuffleBtn.addEventListener('click', () => {
-  if (confirm("정말 풍선판 리셋 및 경품 랜덤 셔플을 진행하시겠습니까? (경품들의 위치가 25개 칸에 무작위로 재배치됩니다)")) {
+  const size = currentPrizes.length;
+  if (confirm(`정말 풍선판 리셋 및 경품 랜덤 셔플을 진행하시겠습니까? (경품들의 위치가 ${size}개 칸에 무작위로 재배치됩니다)`)) {
     SyncHelper.resetBoard({ shuffle: true });
     alert("풍선판이 리셋되고 경품들이 무작위로 뒤섞였습니다!");
   }
@@ -374,7 +428,8 @@ opShuffleBtn.addEventListener('click', () => {
 if (toggleAllWinnerInfo) {
   toggleAllWinnerInfo.addEventListener('change', (e) => {
     const checked = e.target.checked;
-    for (let i = 0; i < 25; i++) {
+    const size = currentPrizes.length;
+    for (let i = 0; i < size; i++) {
       const checkbox = document.getElementById(`require-winner-info-${i}`);
       if (checkbox) checkbox.checked = checked;
     }
@@ -533,7 +588,7 @@ if (!accountId) {
     onInit: (data) => {
       currentPrizes = data.prizes;
       currentPopped = data.popped;
-      currentRequireWinnerInfo = data.requireWinnerInfo || Array(25).fill(false);
+      currentRequireWinnerInfo = data.requireWinnerInfo || Array(currentPrizes.length).fill(false);
       buildGridStructure();
       syncUIWithData();
       loadWinnersCount();
@@ -542,7 +597,7 @@ if (!accountId) {
     onStateUpdate: (data) => {
       currentPrizes = data.prizes;
       currentPopped = data.popped;
-      currentRequireWinnerInfo = data.requireWinnerInfo || Array(25).fill(false);
+      currentRequireWinnerInfo = data.requireWinnerInfo || Array(currentPrizes.length).fill(false);
       syncUIWithData();
     },
     onNewWinner: (winner) => {
@@ -574,4 +629,40 @@ if (!accountId) {
       if (clearWinnersBtn) clearWinnersBtn.disabled = false;
     }
   });
+
+  // Grid Size Selection Buttons Listeners
+  const btn5 = document.getElementById('grid-size-5x5-btn');
+  const btn6 = document.getElementById('grid-size-6x6-btn');
+
+  if (btn5) {
+    btn5.addEventListener('click', () => {
+      changeGridSize(25);
+    });
+  }
+
+  if (btn6) {
+    btn6.addEventListener('click', () => {
+      changeGridSize(36);
+    });
+  }
+
+  function changeGridSize(targetSize) {
+    if (currentPrizes.length === targetSize) return;
+    
+    if (confirm(`풍선판 크기를 ${targetSize === 25 ? '5x5 (25칸)' : '6x6 (36칸)'}(으)로 변경하시겠습니까? 현재 변경사항을 저장해야 최종 적용됩니다.`)) {
+      if (currentPrizes.length > targetSize) {
+        currentPrizes = currentPrizes.slice(0, targetSize);
+        currentPopped = currentPopped.slice(0, targetSize);
+        currentRequireWinnerInfo = currentRequireWinnerInfo.slice(0, targetSize);
+      } else {
+        while (currentPrizes.length < targetSize) {
+          currentPrizes.push("꽝 (아쉬워요!)");
+          currentPopped.push(false);
+          currentRequireWinnerInfo.push(false);
+        }
+      }
+      buildGridStructure();
+      syncUIWithData();
+    }
+  }
 }

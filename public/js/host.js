@@ -6,6 +6,17 @@ class SoundSynth {
   constructor() {
     this.ctx = null;
     this.enabled = true;
+    
+    this.bgmVolume = 0.4;
+    this.bgmMuted = false;
+    this.sfxVolume = 0.9; // High default volume as requested
+    this.sfxMuted = false;
+    
+    this.popBuffer = null;
+    this.bgm = null;
+    
+    // Asynchronously load custom pop audio
+    this.loadPopSound();
   }
   
   init() {
@@ -15,6 +26,58 @@ class SoundSynth {
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
+    if (!this.bgm) {
+      this.bgm = new Audio('/sounds/bgm.webm');
+      this.bgm.loop = true;
+      this.bgm.volume = this.bgmMuted ? 0 : this.bgmVolume;
+    }
+  }
+
+  async loadPopSound() {
+    try {
+      const response = await fetch('/sounds/pop_raw.webm');
+      const arrayBuffer = await response.arrayBuffer();
+      // Defer AudioContext initialization until user gesture if needed,
+      // but try to decode now if possible.
+      const TmpCtx = new (window.AudioContext || window.webkitAudioContext)();
+      this.popBuffer = await TmpCtx.decodeAudioData(arrayBuffer);
+      console.log("Pop sound loaded and decoded successfully. Duration:", this.popBuffer.duration);
+    } catch (e) {
+      console.error("Failed to load/decode pop sound:", e);
+    }
+  }
+
+  startBgm() {
+    this.init();
+    if (this.bgm) {
+      this.bgm.play().catch(err => {
+        console.log("Autoplay blocked. BGM will play on user interaction.", err);
+      });
+    }
+  }
+
+  setBgmVolume(vol) {
+    this.bgmVolume = parseFloat(vol);
+    if (this.bgm) {
+      this.bgm.volume = this.bgmMuted ? 0 : this.bgmVolume;
+    }
+  }
+
+  toggleBgmMute() {
+    this.bgmMuted = !this.bgmMuted;
+    if (this.bgm) {
+      this.bgm.volume = this.bgmMuted ? 0 : this.bgmVolume;
+    }
+    return this.bgmMuted;
+  }
+
+  setSfxVolume(vol) {
+    this.sfxVolume = parseFloat(vol);
+  }
+
+  toggleSfxMute() {
+    this.sfxMuted = !this.sfxMuted;
+    return this.sfxMuted;
   }
 
   toggle(forceState) {
@@ -23,76 +86,57 @@ class SoundSynth {
   }
 
   playPop() {
-    if (!this.enabled) return;
+    if (!this.enabled || this.sfxMuted) return;
     this.init();
+    
+    // If popBuffer is decoded, play it with Web Audio API starting at 0:04
+    if (this.popBuffer) {
+      const ctx = this.ctx;
+      const now = ctx.currentTime;
+      const source = ctx.createBufferSource();
+      source.buffer = this.popBuffer;
+      
+      const gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(this.sfxVolume * 1.5, now); // Boost the volume for extra surprise/impact!
+      
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      // The pop starts at 4.0s offset in the video. Fallback to 0 if buffer is too short.
+      const offset = this.popBuffer.duration > 4.0 ? 4.0 : 0;
+      source.start(now, offset);
+      return;
+    }
+
+    // Fallback: Layered Synthetic Pop
+    this.playSyntheticPop();
+  }
+
+  playSyntheticPop() {
     const ctx = this.ctx;
     const now = ctx.currentTime;
     
-    // Layer 1: Heavy Bass Thud (Sub-woofer impact)
     const osc = ctx.createOscillator();
     const bassGain = ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(320, now);
-    osc.frequency.exponentialRampToValueAtTime(30, now + 0.35); // Deep sweep
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.35);
     
-    bassGain.gain.setValueAtTime(2.2, now); // Super loud initial kick
+    bassGain.gain.setValueAtTime(this.sfxVolume * 2.2, now);
     bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
     
     osc.connect(bassGain);
     bassGain.connect(ctx.destination);
     osc.start(now);
     osc.stop(now + 0.36);
-    
-    // Layer 2: Loud white/pink noise burst (The physical tearing & exploding air sound)
-    const bufferSize = ctx.sampleRate * 0.45; 
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1200, now);
-    filter.frequency.exponentialRampToValueAtTime(100, now + 0.3);
-    
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(2.8, now); // High initial level
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    
-    noise.connect(filter);
-    filter.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
-    
-    noise.start(now);
-    noise.stop(now + 0.32);
-    
-    // Layer 3: High-frequency crack/snap
-    const snapOsc = ctx.createOscillator();
-    const snapGain = ctx.createGain();
-    snapOsc.type = 'sawtooth';
-    snapOsc.frequency.setValueAtTime(1200, now);
-    snapOsc.frequency.exponentialRampToValueAtTime(200, now + 0.06);
-    
-    snapGain.gain.setValueAtTime(1.8, now);
-    snapGain.gain.exponentialRampToValueAtTime(0.01, now + 0.07);
-    
-    snapOsc.connect(snapGain);
-    snapGain.connect(ctx.destination);
-    snapOsc.start(now);
-    snapOsc.stop(now + 0.08);
   }
 
   playMiss() {
-    if (!this.enabled) return;
+    if (!this.enabled || this.sfxMuted) return;
     this.init();
     const ctx = this.ctx;
     const now = ctx.currentTime;
     
-    // Low wooden thud sound
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     
@@ -100,7 +144,7 @@ class SoundSynth {
     osc.frequency.setValueAtTime(120, now);
     osc.frequency.exponentialRampToValueAtTime(10, now + 0.15);
     
-    gain.gain.setValueAtTime(1.2, now);
+    gain.gain.setValueAtTime(this.sfxVolume * 1.2, now);
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
     
     osc.connect(gain);
@@ -108,40 +152,13 @@ class SoundSynth {
     
     osc.start(now);
     osc.stop(now + 0.16);
-    
-    // Short brush noise
-    const bufferSize = ctx.sampleRate * 0.08;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 400;
-    
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.3, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-    
-    noise.connect(filter);
-    filter.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
-    
-    noise.start(now);
-    noise.stop(now + 0.08);
   }
   
   playThrow() {
-    if (!this.enabled) return;
+    if (!this.enabled || this.sfxMuted) return;
     this.init();
     const ctx = this.ctx;
     
-    // Whoosh sound using sweeps on a white noise buffer
     const bufferSize = ctx.sampleRate * 0.35;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -160,7 +177,7 @@ class SoundSynth {
     
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.001, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.12);
+    gain.gain.linearRampToValueAtTime(this.sfxVolume * 0.18, ctx.currentTime + 0.12);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
     
     noise.connect(filter);
@@ -172,7 +189,7 @@ class SoundSynth {
   }
   
   playVictory() {
-    if (!this.enabled) return;
+    if (!this.enabled || this.sfxMuted) return;
     this.init();
     const ctx = this.ctx;
     
@@ -183,7 +200,7 @@ class SoundSynth {
       osc.frequency.setValueAtTime(freq, startTime);
       
       gain.gain.setValueAtTime(0.001, startTime);
-      gain.gain.linearRampToValueAtTime(0.12, startTime + 0.04);
+      gain.gain.linearRampToValueAtTime(this.sfxVolume * 0.12, startTime + 0.04);
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
       
       osc.connect(gain);
@@ -193,13 +210,11 @@ class SoundSynth {
     };
     
     const baseTime = ctx.currentTime;
-    // C major chord rollup arpeggio
     const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
     notes.forEach((freq, idx) => {
       playNote(freq, baseTime + idx * 0.1, 0.5, 'sine');
     });
     
-    // Rich final synth chord
     const playChord = (freq, startTime) => {
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
@@ -216,7 +231,7 @@ class SoundSynth {
       filter.frequency.setValueAtTime(1800, startTime);
       filter.frequency.exponentialRampToValueAtTime(400, startTime + 1.2);
       
-      gain.gain.setValueAtTime(0.15, startTime);
+      gain.gain.setValueAtTime(this.sfxVolume * 0.15, startTime);
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.6);
       
       osc1.connect(filter);
@@ -379,8 +394,12 @@ if (!accountId) {
       serverPrizes = data.prizes;
       serverPopped = data.popped;
       
+      const size = serverPrizes.length;
+      const gridSize = Math.sqrt(size) || 5;
+      gridEl.className = `board-grid grid-${gridSize}x${gridSize}`;
+      
       // Real-time cell state mapping
-      for (let i = 0; i < 25; i++) {
+      for (let i = 0; i < size; i++) {
         const cell = document.getElementById(`cell-${i}`);
         if (cell) {
           if (serverPopped[i] && !cell.classList.contains('popped')) {
@@ -413,14 +432,17 @@ if (!accountId) {
               iconEl.style.display = 'block';
             }
           }
+        } else {
+          renderBoard();
+          break;
         }
       }
       
       const unpoppedCount = serverPopped.filter(p => !p).length;
-      poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / 25`;
+      poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / ${serverPrizes.length}`;
     },
     onReset: () => {
-      serverPopped = Array(25).fill(false);
+      serverPopped = Array(serverPrizes.length).fill(false);
       renderBoard();
       celebrationOverlay.classList.remove('active');
     },
@@ -444,7 +466,9 @@ if (!accountId) {
       lastAnimatedMissIndex = data.index;
       lastAnimatedMissTime = Date.now();
 
-      animateDartThrow(data.index, () => {}, true);
+      animateDartThrow(data.index, () => {
+        executeMiss(data.index);
+      }, true);
     },
     onMobileCount: (count) => {
       mobileCountVal.innerText = `${count}대 연결됨`;
@@ -471,8 +495,11 @@ if (!accountId) {
 // Modify balloon direct click listener to use SyncHelper
 function renderBoard() {
   gridEl.innerHTML = '';
+  const size = serverPrizes.length;
+  const gridSize = Math.sqrt(size) || 5;
+  gridEl.className = `board-grid grid-${gridSize}x${gridSize}`;
   
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < size; i++) {
     const isPopped = serverPopped[i];
     const prize = serverPrizes[i] || '경품';
     const colorIndex = i % balloonColors.length;
@@ -548,7 +575,7 @@ function renderBoard() {
   }
   
   const unpoppedCount = serverPopped.filter(p => !p).length;
-  poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / 25`;
+  poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / ${serverPrizes.length}`;
 }
 
 // Particle Engine
@@ -680,11 +707,21 @@ function executePop(index, prize) {
   }
   
   const unpoppedCount = serverPopped.filter(p => !p).length;
-  poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / 25`;
+  poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / ${serverPrizes.length}`;
   
   const parsed = parsePrize(prize);
   
   setTimeout(() => {
+    const modalCongrats = celebrationOverlay.querySelector('.modal-congrats');
+    const modalTitle = celebrationOverlay.querySelector('.modal-title');
+    const prizeModal = celebrationOverlay.querySelector('.prize-modal');
+    
+    if (prizeModal) {
+      prizeModal.classList.remove('miss-mode');
+    }
+    if (modalCongrats) modalCongrats.innerText = "🎉 CONGRATULATIONS 🎉";
+    if (modalTitle) modalTitle.innerText = "경품 당첨!";
+    
     modalPrizeText.innerText = parsed.text;
     
     // Custom Image display inside the circle
@@ -711,6 +748,29 @@ function executePop(index, prize) {
   }, 450);
 }
 
+function executeMiss(index) {
+  const modalCongrats = celebrationOverlay.querySelector('.modal-congrats');
+  const modalTitle = celebrationOverlay.querySelector('.modal-title');
+  const prizeModal = celebrationOverlay.querySelector('.prize-modal');
+  
+  if (prizeModal) {
+    prizeModal.classList.add('miss-mode');
+  }
+  if (modalCongrats) modalCongrats.innerText = "💥 아쉬워요! 💥";
+  if (modalTitle) modalTitle.innerText = "조준 실패!";
+  
+  if (modalPrizeText) modalPrizeText.innerText = "풍선을 비껴갔습니다! 다시 조준해서 던져보세요.";
+  
+  let modalPrizeImg = document.getElementById('modal-prize-image');
+  if (modalPrizeImg) {
+    modalPrizeImg.style.display = 'none';
+  }
+  modalPrizeEmoji.innerHTML = '😢';
+  modalPrizeEmoji.style.fontSize = ''; // Restore default size
+  
+  celebrationOverlay.classList.add('active');
+}
+
 // UI Event Listeners
 modalCloseBtn.addEventListener('click', () => {
   SyncHelper.confirmPrizeClaim();
@@ -722,16 +782,57 @@ celebrationOverlay.addEventListener('click', (e) => {
   }
 });
 
-soundBtn.addEventListener('click', () => {
-  sounds.init();
-  const enabled = sounds.toggle();
-  soundBtn.innerText = enabled ? '🔊 사운드: 켜짐' : '🔇 사운드: 꺼짐';
-  soundBtn.className = enabled ? 'btn-secondary' : 'btn-secondary muted';
-  
-  if (enabled) {
-    sounds.playPop();
-  }
-});
+// BGM UI listeners
+const bgmMuteBtn = document.getElementById('bgm-mute-btn');
+const bgmVolumeSlider = document.getElementById('bgm-volume-slider');
+const bgmVolumeText = document.getElementById('bgm-volume-text');
+
+if (bgmVolumeSlider) {
+  bgmVolumeSlider.addEventListener('input', (e) => {
+    sounds.init();
+    const vol = e.target.value;
+    sounds.setBgmVolume(vol);
+    if (bgmVolumeText) {
+      bgmVolumeText.innerText = `${Math.round(vol * 100)}%`;
+    }
+    sounds.startBgm();
+  });
+}
+
+if (bgmMuteBtn) {
+  bgmMuteBtn.addEventListener('click', () => {
+    sounds.init();
+    const isMuted = sounds.toggleBgmMute();
+    bgmMuteBtn.innerText = isMuted ? '🔇 뮤트됨' : '🔊 켜짐';
+    bgmMuteBtn.style.color = isMuted ? 'var(--text-muted)' : 'var(--accent-cyan)';
+    sounds.startBgm();
+  });
+}
+
+// SFX UI listeners
+const sfxMuteBtn = document.getElementById('sfx-mute-btn');
+const sfxVolumeSlider = document.getElementById('sfx-volume-slider');
+const sfxVolumeText = document.getElementById('sfx-volume-text');
+
+if (sfxVolumeSlider) {
+  sfxVolumeSlider.addEventListener('input', (e) => {
+    sounds.init();
+    const vol = e.target.value;
+    sounds.setSfxVolume(vol);
+    if (sfxVolumeText) {
+      sfxVolumeText.innerText = `${Math.round(vol * 100)}%`;
+    }
+  });
+}
+
+if (sfxMuteBtn) {
+  sfxMuteBtn.addEventListener('click', () => {
+    sounds.init();
+    const isMuted = sounds.toggleSfxMute();
+    sfxMuteBtn.innerText = isMuted ? '🔇 뮤트됨' : '🔊 켜짐';
+    sfxMuteBtn.style.color = isMuted ? 'var(--text-muted)' : 'var(--accent-cyan)';
+  });
+}
 
 resetBtn.addEventListener('click', () => {
   sounds.init();
@@ -742,6 +843,7 @@ resetBtn.addEventListener('click', () => {
 
 document.body.addEventListener('click', () => {
   sounds.init();
+  sounds.startBgm();
 }, { once: true });
 
 // --- Integrated Prize Editor Overlay Event Listeners ---
@@ -754,7 +856,11 @@ const modalInputsGrid = document.getElementById('modal-inputs-grid');
 
 function buildEditorInputs() {
   modalInputsGrid.innerHTML = '';
-  for (let i = 0; i < 25; i++) {
+  const size = serverPrizes.length;
+  const gridSize = Math.sqrt(size) || 5;
+  modalInputsGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+  
+  for (let i = 0; i < size; i++) {
     const wrapper = document.createElement('div');
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
@@ -911,14 +1017,29 @@ editPrizesOverlay.addEventListener('click', (e) => {
 });
 
 editPresetBtn.addEventListener('click', () => {
-  const balancedPreset = [
-    "스타벅스 커피", "문화상품권 1만원", "꽝 (아쉬워요!)", "치킨 쿠폰", "꽝 (아쉬워요!)",
-    "꽝 (아쉬워요!)", "베스킨라빈스 싱글", "스타벅스 커피", "꽝 (아쉬워요!)", "문화상품권 1만원",
-    "신세계 상품권 3만원", "꽝 (아쉬워요!)", "꽝 (아쉬워요!)", "스타벅스 커피", "꽝 (아쉬워요!)",
-    "치킨 쿠폰", "꽝 (아쉬워요!)", "문화상품권 1만원", "꽝 (아쉬워요!)", "베스킨라빈스 싱글",
-    "꽝 (아쉬워요!)", "스타벅스 커피", "꽝 (아쉬워요!)", "꽝 (아쉬워요!)", "대박! 에어팟 프로"
+  const size = serverPrizes.length;
+  const balancedPreset = [];
+  const basePrizes = [
+    "스타벅스 커피", "문화상품권 1만원", "치킨 쿠폰", "베스킨라빈스 싱글", "신세계 상품권 3만원", "대박! 에어팟 프로"
   ];
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < size; i++) {
+    if (i % 6 === 0) {
+      balancedPreset.push(basePrizes[0]);
+    } else if (i % 8 === 1) {
+      balancedPreset.push(basePrizes[1]);
+    } else if (i % 12 === 2) {
+      balancedPreset.push(basePrizes[2]);
+    } else if (i % 9 === 3) {
+      balancedPreset.push(basePrizes[3]);
+    } else if (i % 18 === 4) {
+      balancedPreset.push(basePrizes[4]);
+    } else if (i === size - 1) {
+      balancedPreset.push(basePrizes[5]);
+    } else {
+      balancedPreset.push("꽝 (아쉬워요!)");
+    }
+  }
+  for (let i = 0; i < size; i++) {
     const input = document.getElementById(`modal-prize-input-${i}`);
     const wrapper = document.getElementById(`modal-cell-wrapper-${i}`);
     if (input) {
@@ -938,7 +1059,8 @@ editPresetBtn.addEventListener('click', () => {
 
 editSaveBtn.addEventListener('click', () => {
   const updatedPrizes = [];
-  for (let i = 0; i < 25; i++) {
+  const size = serverPrizes.length;
+  for (let i = 0; i < size; i++) {
     const input = document.getElementById(`modal-prize-input-${i}`);
     const wrapper = document.getElementById(`modal-cell-wrapper-${i}`);
     const textVal = input ? input.value.trim() || '꽝' : '꽝';

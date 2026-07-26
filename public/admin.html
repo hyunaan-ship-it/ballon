@@ -54,13 +54,25 @@
     <!-- Main Dashboard Grid -->
     <div class="dashboard-layout">
       
-      <!-- Left: 5x5 Prize Cards Inputs -->
+      <!-- Left: Prize Cards Inputs -->
       <section class="prize-edit-panel glass-panel">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="font-size: 1.3rem; font-weight: 700;">🎈 5 x 5 풍선별 경품 편집</h2>
+          <h2 style="font-size: 1.3rem; font-weight: 700;">🎈 풍선판 크기 및 경품 편집</h2>
           <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">각 번호 칸에 들어갈 경품을 입력하세요.</span>
         </div>
-
+        
+        <!-- Grid Size Toggle Selector -->
+        <div class="grid-size-selector-panel glass-panel" style="padding: 15px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; border: 1px dashed var(--glass-border); background: rgba(0, 242, 254, 0.02);">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: 0.9rem; font-weight: 700; color: white;">📐 풍선 칸 크기 선택 (Grid Size)</span>
+            <span style="font-size: 0.78rem; color: var(--text-secondary);">원하는 풍선판의 칸수를 선택해주세요. 즉시 동기화됩니다.</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="grid-size-5x5-btn" class="grid-size-btn active" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px; font-weight: 700;">5 × 5 (25칸)</button>
+            <button type="button" id="grid-size-6x6-btn" class="grid-size-btn" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px; font-weight: 700;">6 × 6 (36칸)</button>
+          </div>
+        </div>
+        
         <form id="prize-form">
           <div class="prize-grid" id="admin-prize-grid">
             <!-- 25 input cells will be dynamically injected here -->

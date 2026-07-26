@@ -172,8 +172,16 @@ function handleDeviceMotion(event) {
 
 // Build aim grid dynamically on mobile screen
 const aimGrid = document.getElementById('aim-grid');
-if (aimGrid) {
-  for (let i = 0; i < 25; i++) {
+let currentAimGridSize = 0;
+
+function rebuildAimGrid(size) {
+  if (!aimGrid) return;
+  aimGrid.innerHTML = '';
+  const gridSize = Math.sqrt(size) || 5;
+  aimGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+  aimGrid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+  
+  for (let i = 0; i < size; i++) {
     const cell = document.createElement('div');
     cell.className = 'aim-cell';
     cell.id = `aim-cell-${i}`;
@@ -184,11 +192,19 @@ if (aimGrid) {
 let mobilePoppedState = Array(25).fill(false);
 
 function updateAimVisualizer() {
-  const col = Math.max(0, Math.min(4, Math.floor(((deviceTilt.x + 1) / 2) * 5)));
-  const row = Math.max(0, Math.min(4, Math.floor(((deviceTilt.y + 1) / 2) * 5)));
-  const tiltedIndex = row * 5 + col;
+  const size = mobilePoppedState.length;
+  const gridSize = Math.sqrt(size) || 5;
   
-  for (let i = 0; i < 25; i++) {
+  if (currentAimGridSize !== size) {
+    currentAimGridSize = size;
+    rebuildAimGrid(size);
+  }
+
+  const col = Math.max(0, Math.min(gridSize - 1, Math.floor(((deviceTilt.x + 1) / 2) * gridSize)));
+  const row = Math.max(0, Math.min(gridSize - 1, Math.floor(((deviceTilt.y + 1) / 2) * gridSize)));
+  const tiltedIndex = row * gridSize + col;
+  
+  for (let i = 0; i < size; i++) {
     const cell = document.getElementById(`aim-cell-${i}`);
     if (cell) {
       cell.className = 'aim-cell';
@@ -488,29 +504,31 @@ if (!accountId) {
       connectionBadge.className = 'connection-badge';
       badgeText.innerText = `연결됨 (계정 ${accountId})`;
       console.log(`Mobile SyncHelper successfully established connection for Account ${accountId}`);
-      if (data && data.popped) {
+      if (data) {
         let popped = data.popped;
         if (typeof popped === 'string') {
           try { popped = JSON.parse(popped); } catch (e) {}
         }
-        mobilePoppedState = Array.isArray(popped) ? popped : Array(25).fill(false);
+        const fallbackSize = (data.prizes && data.prizes.length) ? data.prizes.length : 25;
+        mobilePoppedState = Array.isArray(popped) ? popped : Array(fallbackSize).fill(false);
         updateAimVisualizer();
       }
     },
     onStateUpdate: (data) => {
-      if (data && data.popped) {
+      if (data) {
         let popped = data.popped;
         if (typeof popped === 'string') {
           try { popped = JSON.parse(popped); } catch (e) {}
         }
-        mobilePoppedState = Array.isArray(popped) ? popped : Array(25).fill(false);
+        const fallbackSize = (data.prizes && data.prizes.length) ? data.prizes.length : 25;
+        mobilePoppedState = Array.isArray(popped) ? popped : Array(fallbackSize).fill(false);
         updateAimVisualizer();
       }
     },
     onReset: () => {
       resultOverlay.classList.remove('active');
       resetDartVisuals();
-      mobilePoppedState = Array(25).fill(false);
+      mobilePoppedState = Array(mobilePoppedState.length).fill(false);
       updateAimVisualizer();
     },
     onPrizeConfirmed: () => {

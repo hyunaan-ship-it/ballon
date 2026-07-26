@@ -79,10 +79,10 @@ const defaultPrizes = [
 ];
 
 let accountsState = {
-  "1": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) },
-  "2": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) },
-  "3": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) },
-  "4": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) }
+  "1": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 },
+  "2": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 },
+  "3": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 },
+  "4": { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 }
 };
 
 // Cooldown to prevent duplicate throw triggers on the server side
@@ -103,19 +103,24 @@ if (fs.existsSync(DATA_FILE)) {
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     // Auto-convert legacy single-account data if detected
     if (data.prizes && data.popped) {
+      const size = data.gridSize || Math.sqrt(data.prizes.length) || 5;
       accountsState["1"] = {
         prizes: data.prizes,
         popped: data.popped,
-        requireWinnerInfo: data.requireWinnerInfo || Array(25).fill(false)
+        requireWinnerInfo: data.requireWinnerInfo || Array(data.prizes.length).fill(false),
+        gridSize: size
       };
       console.log("Legacy game state successfully migrated to Account 1");
     } else {
       for (const id of ["1", "2", "3", "4"]) {
         if (data[id]) {
+          const prizes = data[id].prizes || [...defaultPrizes];
+          const size = data[id].gridSize || Math.sqrt(prizes.length) || 5;
           accountsState[id] = {
-            prizes: data[id].prizes || [...defaultPrizes],
-            popped: data[id].popped || Array(25).fill(false),
-            requireWinnerInfo: data[id].requireWinnerInfo || Array(25).fill(false)
+            prizes: prizes,
+            popped: data[id].popped || Array(prizes.length).fill(false),
+            requireWinnerInfo: data[id].requireWinnerInfo || Array(prizes.length).fill(false),
+            gridSize: size
           };
         }
       }
@@ -191,10 +196,12 @@ app.get('/api/board-state/:accountId', (req, res) => {
   const accountId = req.params.accountId || '1';
   const state = accountsState[accountId];
   if (state) {
+    const size = state.gridSize || Math.sqrt(state.prizes.length) || 5;
     res.json({
       prizes: state.prizes,
       popped: state.popped,
-      requireWinnerInfo: state.requireWinnerInfo || Array(25).fill(false)
+      requireWinnerInfo: state.requireWinnerInfo || Array(state.prizes.length).fill(false),
+      gridSize: size
     });
   } else {
     res.status(404).json({ status: 'not_found' });
@@ -204,7 +211,7 @@ app.get('/api/board-state/:accountId', (req, res) => {
 // API endpoint to save board state
 app.post('/api/board-state/:accountId', (req, res) => {
   const accountId = req.params.accountId || '1';
-  const { prizes, popped, requireWinnerInfo } = req.body;
+  const { prizes, popped, requireWinnerInfo, gridSize } = req.body;
   if (!prizes || !popped) {
     return res.status(400).json({ status: 'error', message: 'prizes and popped are required' });
   }
@@ -212,7 +219,8 @@ app.post('/api/board-state/:accountId', (req, res) => {
   accountsState[accountId] = {
     prizes: prizes,
     popped: popped,
-    requireWinnerInfo: requireWinnerInfo || Array(25).fill(false)
+    requireWinnerInfo: requireWinnerInfo || Array(prizes.length).fill(false),
+    gridSize: gridSize || Math.sqrt(prizes.length) || 5
   };
   saveGameState();
   
@@ -352,11 +360,12 @@ io.on('connection', (socket) => {
     socket.accountId = accountId;
     console.log(`Host joined Account ${accountId}: ${socket.id}`);
 
-    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) };
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 };
     socket.emit('init-state', {
       popped: state.popped,
       prizes: state.prizes,
       requireWinnerInfo: state.requireWinnerInfo,
+      gridSize: state.gridSize || 5,
       mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
       localIp: LOCAL_IP
     });
@@ -369,11 +378,12 @@ io.on('connection', (socket) => {
     socket.accountId = accountId;
     console.log(`Mobile controller joined Account ${accountId}: ${socket.id}`);
 
-    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) };
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 };
     socket.emit('init-state', {
       popped: state.popped,
       prizes: state.prizes,
       requireWinnerInfo: state.requireWinnerInfo,
+      gridSize: state.gridSize || 5,
       mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
       localIp: LOCAL_IP
     });
@@ -389,11 +399,12 @@ io.on('connection', (socket) => {
     socket.accountId = accountId;
     console.log(`Admin joined Account ${accountId}: ${socket.id}`);
 
-    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false) };
+    const state = accountsState[accountId] || { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 };
     socket.emit('init-state', {
       popped: state.popped,
       prizes: state.prizes,
       requireWinnerInfo: state.requireWinnerInfo,
+      gridSize: state.gridSize || 5,
       mobileUrl: `http://${LOCAL_IP}:${PORT}/mobile.html?account=${accountId}`,
       localIp: LOCAL_IP
     });
@@ -413,10 +424,10 @@ io.on('connection', (socket) => {
   socket.on('admin-update-prizes', (updatedPrizes) => {
     const accountId = socket.accountId || '1';
     const state = accountsState[accountId];
-    if (state && Array.isArray(updatedPrizes) && updatedPrizes.length === 25) {
+    if (state && Array.isArray(updatedPrizes) && (updatedPrizes.length === 25 || updatedPrizes.length === 36)) {
       state.prizes = updatedPrizes;
       saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo, gridSize: state.gridSize });
       console.log(`Prizes updated by Admin for Account ${accountId}`);
     }
   });
@@ -426,19 +437,53 @@ io.on('connection', (socket) => {
     const accountId = socket.accountId || '1';
     const state = accountsState[accountId];
     if (state && data) {
-      if (Array.isArray(data.prizes) && data.prizes.length === 25) {
+      if (Array.isArray(data.prizes) && (data.prizes.length === 25 || data.prizes.length === 36)) {
         state.prizes = data.prizes;
       }
-      if (Array.isArray(data.requireWinnerInfo) && data.requireWinnerInfo.length === 25) {
+      if (Array.isArray(data.requireWinnerInfo) && (data.requireWinnerInfo.length === 25 || data.requireWinnerInfo.length === 36)) {
         state.requireWinnerInfo = data.requireWinnerInfo;
       }
       saveGameState();
       io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { 
         prizes: state.prizes, 
         popped: state.popped, 
-        requireWinnerInfo: state.requireWinnerInfo 
+        requireWinnerInfo: state.requireWinnerInfo,
+        gridSize: state.gridSize
       });
       console.log(`Prizes and requireWinnerInfo updated by Admin for Account ${accountId}`);
+    }
+  });
+
+  // Admin changes grid size (5x5 or 6x6)
+  socket.on('admin-change-grid-size', (size) => {
+    const accountId = socket.accountId || '1';
+    const state = accountsState[accountId];
+    if (state && (size === 5 || size === 6)) {
+      state.gridSize = size;
+      const targetLen = size * size;
+      
+      // Resize arrays
+      if (state.prizes.length < targetLen) {
+        while (state.prizes.length < targetLen) {
+          state.prizes.push("꽝 (아쉬워요!)");
+          state.popped.push(false);
+          state.requireWinnerInfo.push(false);
+        }
+      } else if (state.prizes.length > targetLen) {
+        state.prizes = state.prizes.slice(0, targetLen);
+        state.popped = state.popped.slice(0, targetLen);
+        state.requireWinnerInfo = state.requireWinnerInfo.slice(0, targetLen);
+      }
+      
+      saveGameState();
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { 
+        prizes: state.prizes, 
+        popped: state.popped, 
+        requireWinnerInfo: state.requireWinnerInfo,
+        gridSize: state.gridSize
+      });
+      io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
+      console.log(`Grid size updated to ${size}x${size} by Admin for Account ${accountId}`);
     }
   });
 
@@ -447,7 +492,7 @@ io.on('connection', (socket) => {
     const accountId = socket.accountId || '1';
     const state = accountsState[accountId];
     if (state) {
-      state.popped = Array(25).fill(false);
+      state.popped = Array(state.prizes.length).fill(false);
       if (options.shuffle) {
         // Shuffle the prizes
         for (let i = state.prizes.length - 1; i > 0; i--) {
@@ -459,7 +504,7 @@ io.on('connection', (socket) => {
         console.log(`Board reset (prizes maintained) for Account ${accountId}`);
       }
       saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo, gridSize: state.gridSize });
       io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
     }
   });
@@ -468,10 +513,10 @@ io.on('connection', (socket) => {
   socket.on('admin-toggle-pop', (index) => {
     const accountId = socket.accountId || '1';
     const state = accountsState[accountId];
-    if (state && index >= 0 && index < 25) {
+    if (state && index >= 0 && index < state.prizes.length) {
       state.popped[index] = !state.popped[index];
       saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo, gridSize: state.gridSize });
       console.log(`Admin toggled popped state of index ${index} to ${state.popped[index]} for Account ${accountId}`);
     }
   });
@@ -508,6 +553,7 @@ io.on('connection', (socket) => {
 
     // Determine if it is a miss (intensity threshold)
     const isMiss = (data.intensity < 0.6) || (Math.random() < 0.15);
+    const gridSize = state.gridSize || Math.sqrt(state.prizes.length) || 5;
 
     if (isMiss) {
       const randomIndex = unpoppedIndices[Math.floor(Math.random() * unpoppedIndices.length)];
@@ -525,19 +571,18 @@ io.on('connection', (socket) => {
     // Calculate target index based on tilt (if provided)
     let targetIndex;
     if (data.tilt && (data.tilt.x !== undefined || data.tilt.y !== undefined)) {
-      // Map tilt to 5x5 grid (0-24)
-      // tilt.x: -1 to 1 (left to right), tilt.y: -1 to 1 (top to bottom)
-      const col = Math.max(0, Math.min(4, Math.floor(((data.tilt.x + 1) / 2) * 5)));
-      const row = Math.max(0, Math.min(4, Math.floor(((data.tilt.y + 1) / 2) * 5)));
+      // Map tilt to gridSize x gridSize grid
+      const col = Math.max(0, Math.min(gridSize - 1, Math.floor(((data.tilt.x + 1) / 2) * gridSize)));
+      const row = Math.max(0, Math.min(gridSize - 1, Math.floor(((data.tilt.y + 1) / 2) * gridSize)));
       
       // Find closest unpopped balloon using 2D distance
       let closestIndex = unpoppedIndices[0];
       let minDistanceSq = Infinity;
       
       for (const idx of unpoppedIndices) {
-        const r = Math.floor(idx / 5);
-        const c = idx % 5;
-        // Make top-row balloons (rows 0 and 1) easier to hit by reducing the perceived vertical distance to them
+        const r = Math.floor(idx / gridSize);
+        const c = idx % gridSize;
+        // Make top-row balloons easier to hit by reducing the perceived vertical distance to them
         const rowDiff = row - r;
         const weightedRowDiff = r < 2 ? rowDiff * 0.5 : rowDiff;
         const distSq = Math.pow(weightedRowDiff, 2) + Math.pow(col - c, 2);
@@ -573,7 +618,7 @@ io.on('connection', (socket) => {
     });
 
     // Sync state to all clients in this account
-    io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo });
+    io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo, gridSize: state.gridSize });
   });
 
   // Mobile/Host confirms prize claim (sync dismiss)
@@ -590,6 +635,24 @@ io.on('connection', (socket) => {
     
     if (!employeeId || !phoneNumber || !prize) {
       socket.emit('winner-info-result', { status: 'error', message: '모든 필드를 입력해주세요.' });
+      return;
+    }
+
+    // Duplicate check globally across all accounts
+    const cleanPhone = (p) => String(p).replace(/[^0-9]/g, '');
+    let isDuplicate = false;
+    for (const accId in winnersData) {
+      if (winnersData[accId].some(
+        w => (w.employeeId && w.employeeId.trim() === employeeId.trim()) || 
+             (w.phoneNumber && cleanPhone(w.phoneNumber) === cleanPhone(phoneNumber))
+      )) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (isDuplicate) {
+      socket.emit('winner-info-result', { status: 'error', message: '이미 등록된 사번 또는 전화번호입니다. 중복 제출이 제한됩니다.' });
       return;
     }
 
@@ -616,7 +679,7 @@ io.on('connection', (socket) => {
   socket.on('host-direct-pop', (index) => {
     const accountId = socket.accountId || '1';
     const state = accountsState[accountId];
-    if (state && index >= 0 && index < 25 && !state.popped[index]) {
+    if (state && index >= 0 && index < state.prizes.length && !state.popped[index]) {
       state.popped[index] = true;
       saveGameState();
 
@@ -627,7 +690,7 @@ io.on('connection', (socket) => {
       };
 
       io.to(`host-room-${accountId}`).emit('balloon-pop-trigger', result);
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped });
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo, gridSize: state.gridSize });
       console.log(`Direct pop from host: index ${index} on Account ${accountId}`);
     }
   });

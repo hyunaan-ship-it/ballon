@@ -83,6 +83,18 @@ export default async function handler(req, res) {
     }
 
     try {
+      // Duplicate check: retrieve existing winners to compare
+      const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+      const allWinners = await supabaseFetch('/winners?select=employee_id,phone_number');
+      const isDuplicate = (allWinners || []).some(w => 
+        (w.employee_id && w.employee_id.trim() === employeeId.trim()) ||
+        (w.phone_number && w.phone_number.replace(/[^0-9]/g, '') === cleanPhone)
+      );
+
+      if (isDuplicate) {
+        return res.status(400).json({ status: 'error', message: '이미 등록된 사번 또는 전화번호입니다. 중복 제출이 제한됩니다.' });
+      }
+
       await supabaseFetch('/winners', {
         method: 'POST',
         body: JSON.stringify({
@@ -95,8 +107,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'success' });
     } catch (err) {
       console.error('[API] POST winners error:', err.message);
-      // If Supabase table doesn't exist yet, still return success
-      // (data was already saved via Supabase broadcast on client side)
+      // If error is duplicate, bubble it up. If it's a structural error (e.g. table not exists yet), proceed.
+      if (err.message.includes('400') || err.message.includes('duplicate')) {
+        return res.status(400).json({ status: 'error', message: err.message });
+      }
       return res.status(200).json({ status: 'success', warning: err.message });
     }
   }

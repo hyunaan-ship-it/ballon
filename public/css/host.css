@@ -147,11 +147,19 @@
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-template-rows: repeat(5, 1fr);
   gap: 15px;
   flex-grow: 1;
   perspective: 1000px;
+}
+
+.board-grid.grid-5x5 {
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+}
+
+.board-grid.grid-6x6 {
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(6, 1fr);
 }
 
 /* Grid Cell wrapper */
@@ -337,12 +345,19 @@
 }
 
 .prize-modal {
-  width: 500px;
-  max-width: 90%;
-  padding: 40px;
+  width: 80vw;
+  height: 80vh;
+  max-width: 80vw;
+  max-height: 80vh;
+  padding: 4vh 4vw;
   text-align: center;
   transform: scale(0.7) translateY(50px);
   transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .modal-overlay.active .prize-modal {
@@ -350,34 +365,41 @@
 }
 
 .modal-congrats {
-  font-size: 1.2rem;
+  font-size: 2.5vh;
   color: var(--accent-cyan);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 10px;
+  letter-spacing: 4px;
+  margin-bottom: 2vh;
 }
 
 .modal-title {
-  font-size: 2rem;
+  font-size: 5vh;
   font-weight: 800;
-  margin-bottom: 25px;
+  margin-bottom: 3vh;
   color: white;
 }
 
 .modal-prize-circle {
-  width: 160px;
-  height: 160px;
+  width: 30vh;
+  height: 30vh;
   border-radius: 50%;
   background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.15));
-  border: 2px solid var(--accent-purple);
-  box-shadow: 0 0 30px rgba(157, 78, 221, 0.3);
-  margin: 0 auto 25px;
+  border: 4px solid var(--accent-purple);
+  box-shadow: 0 0 50px rgba(157, 78, 221, 0.3);
+  margin: 0 auto 3vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 4.5rem;
+  font-size: 10vh;
   animation: modalGlowPulse 2s infinite alternate;
+}
+
+.modal-prize-circle img {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
+  border-radius: 12px;
 }
 
 @keyframes modalGlowPulse {
@@ -386,11 +408,32 @@
 }
 
 .modal-prize-name {
-  font-size: 1.8rem;
+  font-size: 4vh;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 30px;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+  margin-bottom: 4vh;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+/* Miss Mode for Celebration/Feedback Overlay */
+.prize-modal.miss-mode {
+  border-color: rgba(255, 23, 68, 0.4);
+  box-shadow: 0 0 50px rgba(255, 23, 68, 0.25), inset 0 0 30px rgba(255, 23, 68, 0.15);
+}
+
+.prize-modal.miss-mode .modal-congrats {
+  color: #ff1744;
+}
+
+.prize-modal.miss-mode .modal-prize-circle {
+  border-color: #ff1744;
+  box-shadow: 0 0 40px rgba(255, 23, 68, 0.4);
+  animation: modalMissGlowPulse 2s infinite alternate;
+}
+
+@keyframes modalMissGlowPulse {
+  0% { box-shadow: 0 0 25px rgba(255, 23, 68, 0.3), inset 0 0 15px rgba(255, 23, 68, 0.2); }
+  100% { box-shadow: 0 0 45px rgba(255, 23, 68, 0.6), inset 0 0 25px rgba(255, 23, 68, 0.4); }
 }
 
 /* Flying Dart Animation */
