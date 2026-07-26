@@ -53,7 +53,8 @@ export default async function handler(req, res) {
         return res.status(200).json({
           prizes: row.prizes,
           popped: row.popped,
-          requireWinnerInfo: row.require_winner_info
+          requireWinnerInfo: row.require_winner_info,
+          gridSize: row.grid_size || Math.sqrt(row.prizes.length) || 5
         });
       } else {
         return res.status(404).json({ status: 'not_found' });
@@ -67,10 +68,13 @@ export default async function handler(req, res) {
 
   // POST /api/board-state/:accountId - Save board state
   if (req.method === 'POST') {
-    const { prizes, popped, requireWinnerInfo } = req.body || {};
+    const { prizes, popped, requireWinnerInfo, gridSize } = req.body || {};
     if (!prizes || !popped) {
       return res.status(400).json({ status: 'error', message: 'prizes and popped are required' });
     }
+
+    const fallbackSize = prizes.length || 25;
+    const computedGridSize = gridSize || Math.sqrt(fallbackSize) || 5;
 
     try {
       // Check if it exists
@@ -82,7 +86,8 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             prizes,
             popped,
-            require_winner_info: requireWinnerInfo || Array(25).fill(false),
+            require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
+            grid_size: computedGridSize,
             updated_at: new Date().toISOString()
           })
         });
@@ -94,7 +99,8 @@ export default async function handler(req, res) {
             account_id: accountId,
             prizes,
             popped,
-            require_winner_info: requireWinnerInfo || Array(25).fill(false)
+            require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
+            grid_size: computedGridSize
           })
         });
       }

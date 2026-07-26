@@ -34,8 +34,12 @@ CREATE TABLE IF NOT EXISTS public.board_state (
   prizes              JSONB       NOT NULL,
   popped              JSONB       NOT NULL,
   require_winner_info JSONB       NOT NULL,
+  grid_size           INTEGER     NOT NULL DEFAULT 5,
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure grid_size column exists for existing tables
+ALTER TABLE public.board_state ADD COLUMN IF NOT EXISTS grid_size INTEGER NOT NULL DEFAULT 5;
 
 -- Allow anonymous reads, inserts, updates, and deletes
 ALTER TABLE public.board_state ENABLE ROW LEVEL SECURITY;
