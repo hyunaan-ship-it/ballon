@@ -439,6 +439,18 @@ io.on('connection', (socket) => {
     if (state && data) {
       if (Array.isArray(data.prizes) && (data.prizes.length === 25 || data.prizes.length === 36)) {
         state.prizes = data.prizes;
+        const size = data.prizes.length;
+        state.gridSize = data.gridSize || Math.sqrt(size) || 5;
+
+        // Resize popped array to match the size
+        if (!state.popped) state.popped = [];
+        if (state.popped.length < size) {
+          while (state.popped.length < size) {
+            state.popped.push(false);
+          }
+        } else if (state.popped.length > size) {
+          state.popped = state.popped.slice(0, size);
+        }
       }
       if (Array.isArray(data.requireWinnerInfo) && (data.requireWinnerInfo.length === 25 || data.requireWinnerInfo.length === 36)) {
         state.requireWinnerInfo = data.requireWinnerInfo;
@@ -450,7 +462,7 @@ io.on('connection', (socket) => {
         requireWinnerInfo: state.requireWinnerInfo,
         gridSize: state.gridSize
       });
-      console.log(`Prizes and requireWinnerInfo updated by Admin for Account ${accountId}`);
+      console.log(`Prizes, requireWinnerInfo, popped, and gridSize updated by Admin for Account ${accountId}`);
     }
   });
 

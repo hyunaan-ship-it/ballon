@@ -104,7 +104,16 @@ class SoundSynth {
       
       // The pop starts at 4.0s offset in the video. Fallback to 0 if buffer is too short.
       const offset = this.popBuffer.duration > 4.0 ? 4.0 : 0;
+      
+      // IMPORTANT: Stop after 1.2s so the rest of the webm (which may contain BGM audio)
+      // does NOT keep playing and overlap with the looping bgm.webm track.
+      const popDuration = 1.2;
+      gainNode.gain.setValueAtTime(this.sfxVolume * 1.5, now);
+      gainNode.gain.setValueAtTime(this.sfxVolume * 1.5, now + 0.8);
+      gainNode.gain.linearRampToValueAtTime(0.0001, now + popDuration);
+      
       source.start(now, offset);
+      source.stop(now + popDuration);
       return;
     }
 
@@ -397,6 +406,13 @@ if (!accountId) {
       const size = serverPrizes.length;
       const gridSize = Math.sqrt(size) || 5;
       gridEl.className = `board-grid grid-${gridSize}x${gridSize}`;
+      
+      // If DOM cell count differs from state size, completely rebuild the board
+      const cellCount = gridEl.querySelectorAll('.grid-cell').length;
+      if (cellCount !== size) {
+        renderBoard();
+        return;
+      }
       
       // Real-time cell state mapping
       for (let i = 0; i < size; i++) {

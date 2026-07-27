@@ -1168,13 +1168,32 @@ class BalloonSyncHelper {
   }
 
   updatePrizesAndSettings(updatedPrizes, requireWinnerInfo) {
+    const size = updatedPrizes.length;
+    const gridSize = Math.sqrt(size) || 5;
+
     if (this.mode === 'socket') {
-      this.socket.emit('admin-update-prizes-and-settings', { prizes: updatedPrizes, requireWinnerInfo: requireWinnerInfo });
+      this.socket.emit('admin-update-prizes-and-settings', { 
+        prizes: updatedPrizes, 
+        requireWinnerInfo: requireWinnerInfo,
+        gridSize: gridSize
+      });
     } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
       const localKey = `balloon_state_acc_${this.accountId}`;
       let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [], requireWinnerInfo: [] };
       state.prizes = updatedPrizes;
       state.requireWinnerInfo = requireWinnerInfo;
+      state.gridSize = gridSize;
+
+      // Resize popped array to match the new grid size
+      if (!state.popped) state.popped = [];
+      if (state.popped.length < size) {
+        while (state.popped.length < size) {
+          state.popped.push(false);
+        }
+      } else if (state.popped.length > size) {
+        state.popped = state.popped.slice(0, size);
+      }
+
       localStorage.setItem(localKey, JSON.stringify(state));
       this._saveBoardStateSupabase(state);
       
@@ -1194,6 +1213,18 @@ class BalloonSyncHelper {
         if (state) {
           state.prizes = updatedPrizes;
           state.requireWinnerInfo = requireWinnerInfo;
+          state.gridSize = gridSize;
+
+          // Resize popped array to match the new grid size
+          if (!state.popped) state.popped = [];
+          if (state.popped.length < size) {
+            while (state.popped.length < size) {
+              state.popped.push(false);
+            }
+          } else if (state.popped.length > size) {
+            state.popped = state.popped.slice(0, size);
+          }
+
           stateRef.set(state);
         }
       });

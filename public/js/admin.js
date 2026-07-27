@@ -598,6 +598,12 @@ if (!accountId) {
       currentPrizes = data.prizes;
       currentPopped = data.popped;
       currentRequireWinnerInfo = data.requireWinnerInfo || Array(currentPrizes.length).fill(false);
+      
+      const cellCount = adminPrizeGrid.querySelectorAll('.prize-input-cell').length;
+      if (cellCount !== currentPrizes.length) {
+        buildGridStructure();
+      }
+      
       syncUIWithData();
     },
     onNewWinner: (winner) => {
@@ -649,20 +655,18 @@ if (!accountId) {
   function changeGridSize(targetSize) {
     if (currentPrizes.length === targetSize) return;
     
-    if (confirm(`풍선판 크기를 ${targetSize === 25 ? '5x5 (25칸)' : '6x6 (36칸)'}(으)로 변경하시겠습니까? 현재 변경사항을 저장해야 최종 적용됩니다.`)) {
-      if (currentPrizes.length > targetSize) {
-        currentPrizes = currentPrizes.slice(0, targetSize);
-        currentPopped = currentPopped.slice(0, targetSize);
-        currentRequireWinnerInfo = currentRequireWinnerInfo.slice(0, targetSize);
-      } else {
-        while (currentPrizes.length < targetSize) {
-          currentPrizes.push("꽝 (아쉬워요!)");
-          currentPopped.push(false);
-          currentRequireWinnerInfo.push(false);
-        }
+    if (currentPrizes.length > targetSize) {
+      currentPrizes = currentPrizes.slice(0, targetSize);
+      currentPopped = currentPopped.slice(0, targetSize);
+      currentRequireWinnerInfo = currentRequireWinnerInfo.slice(0, targetSize);
+    } else {
+      while (currentPrizes.length < targetSize) {
+        currentPrizes.push("꽝 (아쉬워요!)");
+        currentPopped.push(false);
+        currentRequireWinnerInfo.push(false);
       }
-      buildGridStructure();
-      syncUIWithData();
     }
+    buildGridStructure();
+    syncUIWithData();
   }
 }
