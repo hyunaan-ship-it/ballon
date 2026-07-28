@@ -501,48 +501,51 @@ io.on('connection', (socket) => {
 
   // Admin resets the board
   socket.on('admin-reset-board', (options = {}) => {
-    const accountId = socket.accountId || '1';
-    const state = accountsState[accountId];
-    if (state) {
-      state.popped = Array(state.prizes.length).fill(false);
-      if (options.shuffle) {
-        // Shuffle the prizes and requireWinnerInfo in tandem
-        for (let i = state.prizes.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [state.prizes[i], state.prizes[j]] = [state.prizes[j], state.prizes[i]];
-          if (state.requireWinnerInfo && state.requireWinnerInfo.length === state.prizes.length) {
-            [state.requireWinnerInfo[i], state.requireWinnerInfo[j]] = [state.requireWinnerInfo[j], state.requireWinnerInfo[i]];
-          }
-        }
-        console.log(`Board reset and prizes shuffled for Account ${accountId}`);
-      } else {
-        console.log(`Board reset (prizes maintained) for Account ${accountId}`);
-      }
-      saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', accountsState[accountId]);
-      io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
+    const accountId = String(options.accountId || socket.accountId || '1');
+    if (!accountsState[accountId]) {
+      accountsState[accountId] = { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 };
     }
+    const state = accountsState[accountId];
+    state.popped = Array(state.prizes.length).fill(false);
+    if (options.shuffle) {
+      // Shuffle the prizes and requireWinnerInfo in tandem
+      for (let i = state.prizes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [state.prizes[i], state.prizes[j]] = [state.prizes[j], state.prizes[i]];
+        if (state.requireWinnerInfo && state.requireWinnerInfo.length === state.prizes.length) {
+          [state.requireWinnerInfo[i], state.requireWinnerInfo[j]] = [state.requireWinnerInfo[j], state.requireWinnerInfo[i]];
+        }
+      }
+      console.log(`Board reset and prizes shuffled for Account ${accountId}`);
+    } else {
+      console.log(`Board reset (prizes maintained) for Account ${accountId}`);
+    }
+    saveGameState();
+    io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', accountsState[accountId]);
+    io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
   });
 
   // Admin clears all board prizes/contents
-  socket.on('admin-clear-all-prizes', () => {
-    const accountId = socket.accountId || '1';
-    const state = accountsState[accountId];
-    if (state) {
-      const size = state.prizes.length || 25;
-      state.prizes = Array(size).fill("");
-      state.popped = Array(size).fill(false);
-      state.requireWinnerInfo = Array(size).fill(false);
-      saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', accountsState[accountId]);
-      io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
-      console.log(`All board contents cleared by Admin for Account ${accountId}`);
+  socket.on('admin-clear-all-prizes', (options = {}) => {
+    const accountId = String((typeof options === 'object' && options.accountId) || socket.accountId || '1');
+    if (!accountsState[accountId]) {
+      accountsState[accountId] = { prizes: [...defaultPrizes], popped: Array(25).fill(false), requireWinnerInfo: Array(25).fill(false), gridSize: 5 };
     }
+    const state = accountsState[accountId];
+    const size = state.prizes.length || 25;
+    state.prizes = Array(size).fill("");
+    state.popped = Array(size).fill(false);
+    state.requireWinnerInfo = Array(size).fill(false);
+    saveGameState();
+    io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', accountsState[accountId]);
+    io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
+    console.log(`All board contents cleared by Admin for Account ${accountId}`);
   });
 
   // Admin toggles balloon pop state directly
-  socket.on('admin-toggle-pop', (index) => {
-    const accountId = socket.accountId || '1';
+  socket.on('admin-toggle-pop', (data) => {
+    const index = (typeof data === 'object') ? data.index : data;
+    const accountId = String((typeof data === 'object' && data.accountId) || socket.accountId || '1');
     const state = accountsState[accountId];
     if (state && index >= 0 && index < state.prizes.length) {
       state.popped[index] = !state.popped[index];
