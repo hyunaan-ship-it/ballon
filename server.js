@@ -506,18 +506,37 @@ io.on('connection', (socket) => {
     if (state) {
       state.popped = Array(state.prizes.length).fill(false);
       if (options.shuffle) {
-        // Shuffle the prizes
+        // Shuffle the prizes and requireWinnerInfo in tandem
         for (let i = state.prizes.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [state.prizes[i], state.prizes[j]] = [state.prizes[j], state.prizes[i]];
+          if (state.requireWinnerInfo && state.requireWinnerInfo.length === state.prizes.length) {
+            [state.requireWinnerInfo[i], state.requireWinnerInfo[j]] = [state.requireWinnerInfo[j], state.requireWinnerInfo[i]];
+          }
         }
         console.log(`Board reset and prizes shuffled for Account ${accountId}`);
       } else {
         console.log(`Board reset (prizes maintained) for Account ${accountId}`);
       }
       saveGameState();
-      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', { prizes: state.prizes, popped: state.popped, requireWinnerInfo: state.requireWinnerInfo, gridSize: state.gridSize });
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', accountsState[accountId]);
       io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
+    }
+  });
+
+  // Admin clears all board prizes/contents
+  socket.on('admin-clear-all-prizes', () => {
+    const accountId = socket.accountId || '1';
+    const state = accountsState[accountId];
+    if (state) {
+      const size = state.prizes.length || 25;
+      state.prizes = Array(size).fill("");
+      state.popped = Array(size).fill(false);
+      state.requireWinnerInfo = Array(size).fill(false);
+      saveGameState();
+      io.to(`host-room-${accountId}`).to(`admin-room-${accountId}`).to(`mobile-room-${accountId}`).emit('state-updated', accountsState[accountId]);
+      io.to(`host-room-${accountId}`).to(`mobile-room-${accountId}`).emit('board-reset');
+      console.log(`All board contents cleared by Admin for Account ${accountId}`);
     }
   });
 

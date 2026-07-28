@@ -407,55 +407,7 @@ if (!accountId) {
       const gridSize = Math.sqrt(size) || 5;
       gridEl.className = `board-grid grid-${gridSize}x${gridSize}`;
       
-      // If DOM cell count differs from state size, completely rebuild the board
-      const cellCount = gridEl.querySelectorAll('.grid-cell').length;
-      if (cellCount !== size) {
-        renderBoard();
-        return;
-      }
-      
-      // Real-time cell state mapping
-      for (let i = 0; i < size; i++) {
-        const cell = document.getElementById(`cell-${i}`);
-        if (cell) {
-          if (serverPopped[i] && !cell.classList.contains('popped')) {
-            cell.classList.add('popped');
-          } else if (!serverPopped[i] && cell.classList.contains('popped')) {
-            cell.classList.remove('popped');
-          }
-          
-          const nameEl = cell.querySelector('.prize-name');
-          const iconEl = cell.querySelector('.prize-icon');
-          if (nameEl && iconEl) {
-            const parsed = parsePrize(serverPrizes[i]);
-            nameEl.innerText = parsed.text;
-            
-            let imgEl = cell.querySelector('.prize-img-element');
-            if (parsed.image) {
-              if (!imgEl) {
-                imgEl = document.createElement('img');
-                imgEl.className = 'prize-img-element';
-                iconEl.parentNode.insertBefore(imgEl, iconEl.nextSibling);
-              }
-              imgEl.src = parsed.image;
-              imgEl.style.display = 'block';
-              iconEl.style.display = 'none';
-            } else {
-              if (imgEl) {
-                imgEl.style.display = 'none';
-              }
-              iconEl.innerText = getPrizeEmoji(parsed.text);
-              iconEl.style.display = 'block';
-            }
-          }
-        } else {
-          renderBoard();
-          break;
-        }
-      }
-      
-      const unpoppedCount = serverPopped.filter(p => !p).length;
-      poppedRatioEl.innerText = `남은 풍선: ${unpoppedCount} / ${serverPrizes.length}`;
+      renderBoard();
     },
     onReset: () => {
       serverPopped = Array(serverPrizes.length).fill(false);

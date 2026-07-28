@@ -11,6 +11,7 @@ const prizeForm = document.getElementById('prize-form');
 const saveBtn = document.getElementById('save-prizes-btn');
 const opResetBtn = document.getElementById('op-reset');
 const opShuffleBtn = document.getElementById('op-shuffle');
+const opClearAllBtn = document.getElementById('op-clear-all');
 const downloadCsvBtn = document.getElementById('download-csv-btn');
 const clearWinnersBtn = document.getElementById('clear-winners-btn');
 const winnersCountDiv = document.getElementById('winners-count');
@@ -423,6 +424,15 @@ opShuffleBtn.addEventListener('click', () => {
     alert("풍선판이 리셋되고 경품들이 무작위로 뒤섞였습니다!");
   }
 });
+
+if (opClearAllBtn) {
+  opClearAllBtn.addEventListener('click', () => {
+    if (confirm("⚠️ 정말 풍선판의 모든 경품 내용 및 설정을 전체 삭제하시겠습니까?\n\n이 작업은 모든 칸의 경품명과 이미지를 비우고 풍선을 초기화합니다.")) {
+      SyncHelper.clearAllBoardContents();
+      alert("🗑️ 풍선판의 모든 내용이 전체 삭제되고 초기화되었습니다!");
+    }
+  });
+}
 
 // Master checkbox toggle for requireWinnerInfo
 if (toggleAllWinnerInfo) {

@@ -116,12 +116,20 @@ class BalloonSyncHelper {
       });
 
       this.socket.on('init-state', (data) => {
+        if (data && data.prizes && data.popped) {
+          const localKey = `balloon_state_acc_${this.accountId}`;
+          localStorage.setItem(localKey, JSON.stringify(data));
+        }
         if (this.onInitCallback) {
           this.onInitCallback(data);
         }
       });
 
       this.socket.on('state-updated', (data) => {
+        if (data && data.prizes && data.popped) {
+          const localKey = `balloon_state_acc_${this.accountId}`;
+          localStorage.setItem(localKey, JSON.stringify(data));
+        }
         if (this.onStateUpdateCallback) {
           this.onStateUpdateCallback(data);
         }
@@ -1005,230 +1013,205 @@ class BalloonSyncHelper {
   }
 
   resetBoard(options = {}) {
-    if (this.mode === 'socket') {
-      this.socket.emit('admin-reset-board', options);
-    } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
-      const localKey = `balloon_state_acc_${this.accountId}`;
-      let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
-      state.popped = Array(state.prizes.length).fill(false);
-      if (options.shuffle) {
-        for (let i = state.prizes.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [state.prizes[i], state.prizes[j]] = [state.prizes[j], state.prizes[i]];
+    const localKey = `balloon_state_acc_${this.accountId}`;
+    let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
+    if (!state.prizes || state.prizes.length === 0) {
+      state.prizes = [...defaultPrizes];
+    }
+    state.popped = Array(state.prizes.length).fill(false);
+    if (options.shuffle) {
+      for (let i = state.prizes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [state.prizes[i], state.prizes[j]] = [state.prizes[j], state.prizes[i]];
+        if (state.requireWinnerInfo && state.requireWinnerInfo.length === state.prizes.length) {
+          [state.requireWinnerInfo[i], state.requireWinnerInfo[j]] = [state.requireWinnerInfo[j], state.requireWinnerInfo[i]];
         }
       }
+    }
+    localStorage.setItem(localKey, JSON.stringify(state));
+    this._saveBoardStateSupabase(state);
+
+    if (this.mode === 'socket' && this.socket) {
+      this.socket.emit('admin-reset-board', options);
+    } else if (this.mode === 'supabase' && this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'state-updated',
+        payload: state
+      });
+      this.channel.send({
+        type: 'broadcast',
+        event: 'board-reset',
+        payload: {}
+      });
+    } else if (this.mode === 'firebase' && this.db) {
+      const accountRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}`);
+      accountRef.child('state').set(state);
+      accountRef.child('reset_trigger').set({ timestamp: Date.now() });
+    }
+
+    if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
+    if (this.onResetCallback) this.onResetCallback();
+  }
+
+  clearAllBoardContents() {
+    const localKey = `balloon_state_acc_${this.accountId}`;
+    let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [], requireWinnerInfo: [], gridSize: 5 };
+    const size = (state.prizes && state.prizes.length) ? state.prizes.length : 25;
+    const gridSize = Math.sqrt(size) || 5;
+
+    state.prizes = Array(size).fill("");
+    state.popped = Array(size).fill(false);
+    state.requireWinnerInfo = Array(size).fill(false);
+    state.gridSize = gridSize;
+
+    localStorage.setItem(localKey, JSON.stringify(state));
+    this._saveBoardStateSupabase(state);
+
+    if (this.mode === 'socket' && this.socket) {
+      this.socket.emit('admin-clear-all-prizes');
+    } else if (this.mode === 'supabase' && this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'state-updated',
+        payload: state
+      });
+      this.channel.send({
+        type: 'broadcast',
+        event: 'board-reset',
+        payload: {}
+      });
+    } else if (this.mode === 'firebase' && this.db) {
+      const accountRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}`);
+      accountRef.child('state').set(state);
+      accountRef.child('reset_trigger').set({ timestamp: Date.now() });
+    }
+
+    if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
+    if (this.onResetCallback) this.onResetCallback();
+  }
+
+  togglePop(index) {
+    const localKey = `balloon_state_acc_${this.accountId}`;
+    let state = JSON.parse(localStorage.getItem(localKey));
+    if (state && state.popped) {
+      state.popped[index] = !state.popped[index];
       localStorage.setItem(localKey, JSON.stringify(state));
       this._saveBoardStateSupabase(state);
-      
-      if (this.mode === 'supabase') {
+
+      if (this.mode === 'socket' && this.socket) {
+        this.socket.emit('admin-toggle-pop', index);
+      } else if (this.mode === 'supabase' && this.channel) {
         this.channel.send({
           type: 'broadcast',
           event: 'state-updated',
           payload: state
         });
-        this.channel.send({
-          type: 'broadcast',
-          event: 'board-reset',
-          payload: {}
-        });
-      } else {
-        if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
-        if (this.onResetCallback) this.onResetCallback();
+      } else if (this.mode === 'firebase' && this.db) {
+        const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/state`);
+        stateRef.set(state);
       }
-    } else {
-      const accountRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}`);
-      accountRef.child('state').once('value', (snapshot) => {
-        const state = snapshot.val();
-        if (state) {
-          state.popped = Array(state.prizes.length).fill(false);
-          if (options.shuffle) {
-            for (let i = state.prizes.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [state.prizes[i], state.prizes[j]] = [state.prizes[j], state.prizes[i]];
-            }
-          }
-          accountRef.child('state').set(state);
-          accountRef.child('reset_trigger').set({ timestamp: Date.now() });
-        }
-      });
-    }
-  }
 
-  togglePop(index) {
-    if (this.mode === 'socket') {
-      this.socket.emit('admin-toggle-pop', index);
-    } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
-      const localKey = `balloon_state_acc_${this.accountId}`;
-      let state = JSON.parse(localStorage.getItem(localKey));
-      if (state && state.popped) {
-        state.popped[index] = !state.popped[index];
-        localStorage.setItem(localKey, JSON.stringify(state));
-        this._saveBoardStateSupabase(state);
-        
-        if (this.mode === 'supabase') {
-          this.channel.send({
-            type: 'broadcast',
-            event: 'state-updated',
-            payload: state
-          });
-        } else {
-          if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
-        }
-      }
-    } else {
-      const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/state`);
-      stateRef.once('value', (snapshot) => {
-        const state = snapshot.val();
-        if (state && state.popped) {
-          state.popped[index] = !state.popped[index];
-          stateRef.set(state);
-        }
-      });
+      if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
     }
   }
 
   hostDirectPop(index) {
-    if (this.mode === 'socket') {
-      this.socket.emit('host-direct-pop', index);
-    } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
-      const localKey = `balloon_state_acc_${this.accountId}`;
-      let state = JSON.parse(localStorage.getItem(localKey));
-      if (state && !state.popped[index]) {
-        state.popped[index] = true;
-        localStorage.setItem(localKey, JSON.stringify(state));
-        this._saveBoardStateSupabase(state);
-        
-        if (this.mode === 'supabase') {
-          this.channel.send({
-            type: 'broadcast',
-            event: 'state-updated',
-            payload: state
-          });
-          this.channel.send({
-            type: 'broadcast',
-            event: 'balloon-pop-trigger',
-            payload: { index: index, prize: state.prizes[index], intensity: 1.0 }
-          });
-        } else {
-          if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
-          if (this.onPopTriggerCallback) {
-            this.onPopTriggerCallback({ index: index, prize: state.prizes[index], intensity: 1.0 });
-          }
-        }
-      }
-    } else {
-      const accountRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}`);
-      accountRef.child('state').once('value', (snapshot) => {
-        const state = snapshot.val();
-        if (state && !state.popped[index]) {
-          state.popped[index] = true;
-          accountRef.child('state').set(state);
-          
-          if (this.onPopTriggerCallback) {
-            this.onPopTriggerCallback({
-              index: index,
-              prize: state.prizes[index],
-              intensity: 1.0
-            });
-          }
-        }
-      });
-    }
-  }
-
-  updatePrizes(updatedPrizes) {
-    if (this.mode === 'socket') {
-      this.socket.emit('admin-update-prizes', updatedPrizes);
-    } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
-      const localKey = `balloon_state_acc_${this.accountId}`;
-      let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
-      state.prizes = updatedPrizes;
+    const localKey = `balloon_state_acc_${this.accountId}`;
+    let state = JSON.parse(localStorage.getItem(localKey));
+    if (state && !state.popped[index]) {
+      state.popped[index] = true;
       localStorage.setItem(localKey, JSON.stringify(state));
       this._saveBoardStateSupabase(state);
-      
-      if (this.mode === 'supabase') {
+
+      if (this.mode === 'socket' && this.socket) {
+        this.socket.emit('host-direct-pop', index);
+      } else if (this.mode === 'supabase' && this.channel) {
         this.channel.send({
           type: 'broadcast',
           event: 'state-updated',
           payload: state
         });
-      } else {
-        if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
+        this.channel.send({
+          type: 'broadcast',
+          event: 'balloon-pop-trigger',
+          payload: { index: index, prize: state.prizes[index], intensity: 1.0 }
+        });
+      } else if (this.mode === 'firebase' && this.db) {
+        const accountRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}`);
+        accountRef.child('state').set(state);
       }
-    } else {
-      const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/state`);
-      stateRef.once('value', (snapshot) => {
-        const state = snapshot.val();
-        if (state) {
-          state.prizes = updatedPrizes;
-          stateRef.set(state);
-        }
-      });
+
+      if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
+      if (this.onPopTriggerCallback) {
+        this.onPopTriggerCallback({ index: index, prize: state.prizes[index], intensity: 1.0 });
+      }
     }
+  }
+
+  updatePrizes(updatedPrizes) {
+    const localKey = `balloon_state_acc_${this.accountId}`;
+    let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [] };
+    state.prizes = updatedPrizes;
+    localStorage.setItem(localKey, JSON.stringify(state));
+    this._saveBoardStateSupabase(state);
+
+    if (this.mode === 'socket' && this.socket) {
+      this.socket.emit('admin-update-prizes', updatedPrizes);
+    } else if (this.mode === 'supabase' && this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'state-updated',
+        payload: state
+      });
+    } else if (this.mode === 'firebase' && this.db) {
+      const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/state`);
+      stateRef.set(state);
+    }
+
+    if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
   }
 
   updatePrizesAndSettings(updatedPrizes, requireWinnerInfo) {
     const size = updatedPrizes.length;
     const gridSize = Math.sqrt(size) || 5;
 
-    if (this.mode === 'socket') {
+    const localKey = `balloon_state_acc_${this.accountId}`;
+    let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [], requireWinnerInfo: [] };
+    state.prizes = updatedPrizes;
+    state.requireWinnerInfo = requireWinnerInfo;
+    state.gridSize = gridSize;
+
+    if (!state.popped) state.popped = [];
+    if (state.popped.length < size) {
+      while (state.popped.length < size) {
+        state.popped.push(false);
+      }
+    } else if (state.popped.length > size) {
+      state.popped = state.popped.slice(0, size);
+    }
+
+    localStorage.setItem(localKey, JSON.stringify(state));
+    this._saveBoardStateSupabase(state);
+
+    if (this.mode === 'socket' && this.socket) {
       this.socket.emit('admin-update-prizes-and-settings', { 
         prizes: updatedPrizes, 
         requireWinnerInfo: requireWinnerInfo,
         gridSize: gridSize
       });
-    } else if (this.mode === 'local-fallback' || this.mode === 'supabase') {
-      const localKey = `balloon_state_acc_${this.accountId}`;
-      let state = JSON.parse(localStorage.getItem(localKey)) || { prizes: [], popped: [], requireWinnerInfo: [] };
-      state.prizes = updatedPrizes;
-      state.requireWinnerInfo = requireWinnerInfo;
-      state.gridSize = gridSize;
-
-      // Resize popped array to match the new grid size
-      if (!state.popped) state.popped = [];
-      if (state.popped.length < size) {
-        while (state.popped.length < size) {
-          state.popped.push(false);
-        }
-      } else if (state.popped.length > size) {
-        state.popped = state.popped.slice(0, size);
-      }
-
-      localStorage.setItem(localKey, JSON.stringify(state));
-      this._saveBoardStateSupabase(state);
-      
-      if (this.mode === 'supabase') {
-        this.channel.send({
-          type: 'broadcast',
-          event: 'state-updated',
-          payload: state
-        });
-      } else {
-        if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
-      }
-    } else {
-      const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/state`);
-      stateRef.once('value', (snapshot) => {
-        const state = snapshot.val();
-        if (state) {
-          state.prizes = updatedPrizes;
-          state.requireWinnerInfo = requireWinnerInfo;
-          state.gridSize = gridSize;
-
-          // Resize popped array to match the new grid size
-          if (!state.popped) state.popped = [];
-          if (state.popped.length < size) {
-            while (state.popped.length < size) {
-              state.popped.push(false);
-            }
-          } else if (state.popped.length > size) {
-            state.popped = state.popped.slice(0, size);
-          }
-
-          stateRef.set(state);
-        }
+    } else if (this.mode === 'supabase' && this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'state-updated',
+        payload: state
       });
+    } else if (this.mode === 'firebase' && this.db) {
+      const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${this.accountId}/state`);
+      stateRef.set(state);
     }
+
+    if (this.onStateUpdateCallback) this.onStateUpdateCallback(state);
   }
 
   throwDart(intensity, extraData = {}, onResult) {

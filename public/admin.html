@@ -121,18 +121,22 @@
 
         <!-- Board State Operations -->
         <div class="toolkit-card glass-panel">
-          <h3 class="toolkit-title">풍선판 초기화</h3>
+          <h3 class="toolkit-title">풍선판 초기화 &amp; 비우기</h3>
           
           <button id="op-reset" class="btn-secondary" style="width: 100%; margin-bottom: 8px; justify-content: center; font-size: 0.85rem;">
             🔄 풍선 리셋 (경품 위치 유지)
           </button>
           
-          <button id="op-shuffle" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem; background: rgba(157, 78, 221, 0.05); border-color: rgba(157, 78, 221, 0.2); color: #c8a2c9;">
+          <button id="op-shuffle" class="btn-secondary" style="width: 100%; margin-bottom: 8px; justify-content: center; font-size: 0.85rem; background: rgba(157, 78, 221, 0.05); border-color: rgba(157, 78, 221, 0.2); color: #c8a2c9;">
             🔀 풍선 리셋 + 경품 셔플 (랜덤 섞기)
           </button>
+
+          <button id="op-clear-all" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem; background: rgba(255, 23, 68, 0.08); border-color: rgba(255, 23, 68, 0.3); color: #ff5252; font-weight: 700;">
+            🗑️ 풍선판 내용 전체 삭제 (빈 칸 비우기)
+          </button>
           
-          <div class="alert-box" style="background: rgba(255, 23, 68, 0.02); border-color: rgba(255, 23, 68, 0.1); margin-top: 5px; font-size: 0.8rem;">
-            ⚠️ <strong>풍선 리셋</strong>을 진행하면 터졌던 풍선들이 전부 재생성되며, <strong>경품 셔플</strong>을 진행할 경우 경품들의 위치가 무작위로 뒤바뀝니다!
+          <div class="alert-box" style="background: rgba(255, 23, 68, 0.02); border-color: rgba(255, 23, 68, 0.1); margin-top: 8px; font-size: 0.8rem;">
+            ⚠️ <strong>풍선 리셋</strong>을 진행하면 터졌던 풍선들이 전부 재생성되며, <strong>전체 삭제</strong>를 누르면 모든 칸의 경품 및 설정이 완전히 초기화(삭제)됩니다.
           </div>
         </div>
 
