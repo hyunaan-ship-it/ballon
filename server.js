@@ -433,8 +433,8 @@ io.on('connection', (socket) => {
   });
 
   // Admin updates both prizes and settings at the same time
-  socket.on('admin-update-prizes-and-settings', (data) => {
-    const accountId = socket.accountId || '1';
+  socket.on('admin-update-prizes-and-settings', (data = {}) => {
+    const accountId = String(data.accountId || socket.accountId || '1');
     const state = accountsState[accountId];
     if (state && data) {
       if (Array.isArray(data.prizes) && (data.prizes.length === 25 || data.prizes.length === 36)) {

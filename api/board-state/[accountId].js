@@ -77,21 +77,32 @@ export default async function handler(req, res) {
     const computedGridSize = gridSize || Math.sqrt(fallbackSize) || 5;
 
     try {
-      // Perform atomic Upsert on account_id
-      await supabaseFetch('/board_state?on_conflict=account_id', {
-        method: 'POST',
-        headers: {
-          'Prefer': 'resolution=merge-duplicates,return=representation'
-        },
-        body: JSON.stringify({
-          account_id: String(accountId),
-          prizes,
-          popped,
-          require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
-          grid_size: computedGridSize,
-          updated_at: new Date().toISOString()
-        })
-      });
+      // Check if record exists for this account_id
+      const existing = await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(accountId)}`);
+      if (existing && existing.length > 0) {
+        // Record exists, update via PATCH
+        await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(accountId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            prizes,
+            popped,
+            require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
+            updated_at: new Date().toISOString()
+          })
+        });
+      } else {
+        // Record does not exist, insert via POST
+        await supabaseFetch('/board_state', {
+          method: 'POST',
+          body: JSON.stringify({
+            account_id: String(accountId),
+            prizes,
+            popped,
+            require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
+            updated_at: new Date().toISOString()
+          })
+        });
+      }
       return res.status(200).json({ status: 'success' });
     } catch (err) {
       console.error('[API] POST board-state error:', err.message);
