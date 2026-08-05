@@ -61,6 +61,23 @@ class BalloonSyncHelper {
     this.onDisconnectCallback = onDisconnect || null;
     this.onConnectCallback = onConnect || null;
 
+    // Instant optimistic render from localStorage cache (<10ms)
+    const localKey = `balloon_state_acc_${this.accountId}`;
+    try {
+      const cached = localStorage.getItem(localKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.prizes && parsed.popped && this.onInitCallback) {
+          this.onInitCallback({
+            prizes: parsed.prizes,
+            popped: parsed.popped,
+            requireWinnerInfo: parsed.requireWinnerInfo || Array(25).fill(false),
+            mobileUrl: window.location.origin + `/mobile.html?room=${this.room}&account=${this.accountId}`
+          });
+        }
+      }
+    } catch (e) {}
+
     console.log(`[SyncHelper] Initializing in ${this.mode.toUpperCase()} mode for Account ${this.accountId}, Room ${this.room}`);
 
     if (this.mode === 'socket') {
@@ -74,11 +91,23 @@ class BalloonSyncHelper {
 
   _initSocket() {
     if (typeof io === 'undefined') {
-      console.warn("[SyncHelper] Socket.io library not loaded! Falling back to local sandbox.");
-      this._fallbackToLocal("Socket.io library missing");
-      return;
+      console.log("[SyncHelper] Dynamically loading Socket.io client...");
+      const script = document.createElement('script');
+      script.src = '/socket.io/socket.io.js';
+      script.onload = () => {
+        this._setupSocketClient();
+      };
+      script.onerror = () => {
+        console.warn("[SyncHelper] Socket.io script load failed! Falling back to local sandbox.");
+        this._fallbackToLocal("Socket.io library missing or failed to load");
+      };
+      document.head.appendChild(script);
+    } else {
+      this._setupSocketClient();
     }
+  }
 
+  _setupSocketClient() {
     try {
       this.socket = io();
 
@@ -193,12 +222,31 @@ class BalloonSyncHelper {
 
   _initFirebase() {
     if (typeof firebase === 'undefined') {
-      console.warn("[SyncHelper] Firebase compatibility library not loaded! Falling back to local sandbox.");
-      this._fallbackToLocal("Firebase library missing");
-      return;
+      console.log("[SyncHelper] Dynamically loading Firebase SDK CDN...");
+      const script1 = document.createElement('script');
+      script1.src = 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js';
+      script1.onload = () => {
+        const script2 = document.createElement('script');
+        script2.src = 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js';
+        script2.onload = () => {
+          this._setupFirebaseClient();
+        };
+        script2.onerror = () => {
+          this._fallbackToLocal("Firebase database library missing or failed to load");
+        };
+        document.head.appendChild(script2);
+      };
+      script1.onerror = () => {
+        this._fallbackToLocal("Firebase app library missing or failed to load");
+      };
+      document.head.appendChild(script1);
+    } else {
+      this._setupFirebaseClient();
     }
+  }
 
-    // Set a safety timeout of 12 seconds (provides enough time for iOS permission dialog and cold starts)
+  _setupFirebaseClient() {
+    // Set a safety timeout of 12 seconds
     this.fallbackTimer = setTimeout(() => {
       console.warn("[SyncHelper] Firebase RTDB connection timed out (12s). Falling back to local sandbox storage.");
       this._fallbackToLocal("Firebase connection timeout (12s)");
@@ -385,20 +433,17 @@ class BalloonSyncHelper {
     }
   }
 
-  async _setupSupabaseClient() {
-    try {
-      const configRes = await fetch('/api/config').catch(() => null);
-      if (configRes && configRes.ok) {
-        const configData = await configRes.json();
-        if (configData.supabaseUrl && configData.supabaseAnonKey) {
+  _setupSupabaseClient() {
+    // Non-blocking background fetch for dynamic server config if needed
+    fetch('/api/config')
+      .then(res => res.ok ? res.json() : null)
+      .then(configData => {
+        if (configData && configData.supabaseUrl && configData.supabaseAnonKey) {
           SYNC_CONFIG.supabase.url = configData.supabaseUrl;
           SYNC_CONFIG.supabase.anonKey = configData.supabaseAnonKey;
-          console.log("[SyncHelper] Loaded dynamic Supabase config from server:", SYNC_CONFIG.supabase.url);
         }
-      }
-    } catch (err) {
-      console.warn("[SyncHelper] Failed to fetch server config, using local defaults:", err);
-    }
+      })
+      .catch(err => console.warn("[SyncHelper] Background config fetch skipped:", err));
 
     if (!SYNC_CONFIG.supabase || !SYNC_CONFIG.supabase.url || !SYNC_CONFIG.supabase.anonKey || SYNC_CONFIG.supabase.url.includes('your-supabase')) {
       console.warn("[SyncHelper] Supabase credentials not configured! Falling back to local sandbox.");

@@ -4,23 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>🎯 모바일 다트 컨트롤러</title>
+  <!-- Preconnect & Web Fonts for high-performance non-blocking load -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap">
+
   <link rel="stylesheet" href="css/common.css">
   <link rel="stylesheet" href="css/mobile.css">
-  
-  <!-- Firebase Core SDK and Database Compatibility -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  
-  <!-- Config and Sync Layer -->
-  <script src="js/firebase-config.js"></script>
-  <script src="js/sync-helper.js"></script>
-  
-  <!-- Script loader for Socket.io -->
-  <script>
-    if (SYNC_CONFIG.mode === 'socket') {
-      document.write('<script src="/socket.io/socket.io.js"><\/script>');
-    }
-  </script>
+
+  <!-- Deferred non-blocking scripts -->
+  <script src="js/firebase-config.js" defer></script>
+  <script src="js/sync-helper.js" defer></script>
 </head>
 <body>
 
