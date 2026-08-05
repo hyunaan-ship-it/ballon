@@ -344,6 +344,9 @@ if (!accountId) {
   // Dismiss overlay
   accountOverlay.style.display = 'none';
   
+  // Render default board immediately so balloons appear on screen without waiting
+  renderBoard();
+  
   // Highlight active pill switcher
   document.querySelectorAll('.pill-btn').forEach(pill => {
     const acc = pill.getAttribute('data-acc');
