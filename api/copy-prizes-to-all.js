@@ -36,60 +36,76 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { sourceAccountId, prizes, requireWinnerInfo, gridSize } = req.body || {};
-    let targetPrizes = prizes;
-    let targetRequire = requireWinnerInfo;
-    let targetSize = gridSize;
+    try {
+      const { sourceAccountId, prizes, requireWinnerInfo, gridSize } = req.body || {};
+      let targetPrizes = prizes;
+      let targetRequire = requireWinnerInfo;
+      let targetSize = gridSize;
 
-    if (!targetPrizes && sourceAccountId) {
-      try {
-        const rows = await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(sourceAccountId)}`);
-        if (rows && rows.length > 0) {
-          targetPrizes = rows[0].prizes;
-          targetRequire = rows[0].require_winner_info;
-          targetSize = rows[0].grid_size;
+      if ((!targetPrizes || !Array.isArray(targetPrizes) || targetPrizes.length === 0) && sourceAccountId) {
+        try {
+          const rows = await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(sourceAccountId)}`);
+          if (rows && rows.length > 0) {
+            targetPrizes = rows[0].prizes;
+            targetRequire = rows[0].require_winner_info;
+            targetSize = rows[0].grid_size;
+          }
+        } catch (err) {
+          console.error('[CopyPrizes] Failed to fetch source account board state:', err);
         }
-      } catch (err) {}
-    }
+      }
 
-    if (!targetPrizes || !Array.isArray(targetPrizes)) {
-      return res.status(400).json({ status: 'error', message: 'prizes data is required' });
-    }
+      if (!targetPrizes || !Array.isArray(targetPrizes) || targetPrizes.length === 0) {
+        return res.status(400).json({ status: 'error', message: 'Valid prizes array is required' });
+      }
 
-    const fallbackSize = targetPrizes.length || 25;
-    const requireVal = targetRequire || Array(fallbackSize).fill(false);
-    const sizeVal = targetSize || Math.sqrt(fallbackSize) || 5;
+      const fallbackSize = targetPrizes.length || 25;
+      const requireVal = targetRequire || Array(fallbackSize).fill(false);
+      const sizeVal = targetSize || Math.sqrt(fallbackSize) || 5;
 
-    for (const id of ["1", "2", "3", "4", "5"]) {
-      try {
-        const existing = await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(id)}`);
-        if (existing && existing.length > 0) {
-          await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(id)}`, {
-            method: 'PATCH',
-            body: JSON.stringify({
-              prizes: targetPrizes,
-              popped: Array(fallbackSize).fill(false),
-              require_winner_info: requireVal,
-              grid_size: sizeVal,
-              updated_at: new Date().toISOString()
-            })
-          });
-        } else {
-          await supabaseFetch('/board_state', {
-            method: 'POST',
-            body: JSON.stringify({
-              account_id: String(id),
-              prizes: targetPrizes,
-              popped: Array(fallbackSize).fill(false),
-              require_winner_info: requireVal,
-              grid_size: sizeVal
-            })
-          });
+      const errors = [];
+      for (const id of ["1", "2", "3", "4", "5"]) {
+        try {
+          const existing = await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(id)}`);
+          if (existing && existing.length > 0) {
+            await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(id)}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                prizes: targetPrizes,
+                popped: Array(fallbackSize).fill(false),
+                require_winner_info: requireVal,
+                grid_size: sizeVal,
+                updated_at: new Date().toISOString()
+              })
+            });
+          } else {
+            await supabaseFetch('/board_state', {
+              method: 'POST',
+              body: JSON.stringify({
+                account_id: String(id),
+                prizes: targetPrizes,
+                popped: Array(fallbackSize).fill(false),
+                require_winner_info: requireVal,
+                grid_size: sizeVal,
+                updated_at: new Date().toISOString()
+              })
+            });
+          }
+        } catch (err) {
+          console.error(`[CopyPrizes] Error updating account ${id}:`, err.message);
+          errors.push({ accountId: id, error: err.message });
         }
-      } catch (err) {}
-    }
+      }
 
-    return res.status(200).json({ status: 'success' });
+      if (errors.length === 5) {
+        return res.status(500).json({ status: 'error', message: 'Failed to update database for all accounts', errors });
+      }
+
+      return res.status(200).json({ status: 'success', warnings: errors.length > 0 ? errors : undefined });
+    } catch (mainErr) {
+      console.error('[CopyPrizes] General error:', mainErr);
+      return res.status(500).json({ status: 'error', message: mainErr.message });
+    }
   }
 
   return res.status(405).json({ status: 'error', message: 'Method not allowed' });

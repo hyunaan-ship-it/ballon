@@ -87,6 +87,7 @@ export default async function handler(req, res) {
             prizes,
             popped,
             require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
+            grid_size: computedGridSize,
             updated_at: new Date().toISOString()
           })
         });
@@ -99,6 +100,7 @@ export default async function handler(req, res) {
             prizes,
             popped,
             require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
+            grid_size: computedGridSize,
             updated_at: new Date().toISOString()
           })
         });

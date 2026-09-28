@@ -2,15 +2,22 @@
 // Abstracts Socket.io, Firebase RTDB, and Supabase Realtime Broadcast behind a unified interface to support local, serverless, and peer-to-peer modes.
 
 function parsePrize(prizeStr) {
-  if (typeof prizeStr === 'string' && prizeStr.startsWith('{')) {
+  if (!prizeStr) return { text: '', image: '' };
+  if (typeof prizeStr === 'object') {
+    return {
+      text: prizeStr.text !== undefined ? String(prizeStr.text) : '',
+      image: prizeStr.image || ''
+    };
+  }
+  if (typeof prizeStr === 'string' && prizeStr.trim().startsWith('{')) {
     try {
       const parsed = JSON.parse(prizeStr);
       if (parsed && (parsed.text !== undefined || parsed.image !== undefined)) {
-        return { text: parsed.text || '', image: parsed.image || '' };
+        return { text: parsed.text !== undefined ? String(parsed.text) : '', image: parsed.image || '' };
       }
     } catch (e) {}
   }
-  return { text: prizeStr || '', image: '' };
+  return { text: String(prizeStr || ''), image: '' };
 }
 
 class BalloonSyncHelper {
@@ -701,10 +708,12 @@ class BalloonSyncHelper {
                 } catch (e) {
                   console.warn("[SyncHelper] Failed to parse apiLoadedState fields:", e);
                 }
+                let parsedGridSize = data.gridSize || Math.sqrt(parsedPrizes.length) || 5;
                 apiLoadedState = {
                   prizes: parsedPrizes,
                   popped: parsedPopped,
-                  requireWinnerInfo: parsedRequire
+                  requireWinnerInfo: parsedRequire,
+                  gridSize: parsedGridSize
                 };
                 console.log(`[SyncHelper] Successfully loaded board state from database for Account ${this.accountId}`);
               }
@@ -1330,6 +1339,26 @@ class BalloonSyncHelper {
   copyPrizesToAllAccounts(updatedPrizes, requireWinnerInfo, gridSize) {
     const size = updatedPrizes.length;
     const sizeVal = gridSize || Math.sqrt(size) || 5;
+    const cleanPopped = Array(size).fill(false);
+
+    // Update localStorage for ALL accounts 1..5 immediately
+    for (let id = 1; id <= 5; id++) {
+      const localKey = `balloon_state_acc_${id}`;
+      const state = {
+        prizes: updatedPrizes,
+        popped: [...cleanPopped],
+        requireWinnerInfo: requireWinnerInfo || Array(size).fill(false),
+        gridSize: sizeVal
+      };
+      localStorage.setItem(localKey, JSON.stringify(state));
+    }
+
+    const currentState = {
+      prizes: updatedPrizes,
+      popped: cleanPopped,
+      requireWinnerInfo: requireWinnerInfo || Array(size).fill(false),
+      gridSize: sizeVal
+    };
 
     if (this.mode === 'socket' && this.socket) {
       this.socket.emit('admin-copy-prizes-to-all', {
@@ -1338,6 +1367,27 @@ class BalloonSyncHelper {
         requireWinnerInfo: requireWinnerInfo,
         gridSize: sizeVal
       });
+    } else if (this.mode === 'supabase' && this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'state-updated',
+        payload: currentState
+      });
+      this.channel.send({
+        type: 'broadcast',
+        event: 'board-reset',
+        payload: {}
+      });
+    } else if (this.mode === 'firebase' && this.db) {
+      for (let id = 1; id <= 5; id++) {
+        const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${id}/state`);
+        stateRef.set({
+          prizes: updatedPrizes,
+          popped: cleanPopped,
+          requireWinnerInfo: requireWinnerInfo || Array(size).fill(false),
+          gridSize: sizeVal
+        });
+      }
     }
 
     // Call REST endpoint to force all accounts persistence on server
@@ -1350,7 +1400,14 @@ class BalloonSyncHelper {
         requireWinnerInfo: requireWinnerInfo,
         gridSize: sizeVal
       })
-    }).catch(err => {});
+    }).then(res => res.json()).then(data => {
+      console.log("[SyncHelper] copy-prizes-to-all API response:", data);
+    }).catch(err => {
+      console.warn("[SyncHelper] copy-prizes-to-all API error:", err);
+    });
+
+    if (this.onStateUpdateCallback) this.onStateUpdateCallback(currentState);
+    if (this.onResetCallback) this.onResetCallback();
   }
 
   throwDart(intensity, extraData = {}, onResult) {
