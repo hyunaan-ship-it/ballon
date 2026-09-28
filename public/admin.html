@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚙️ 운영자 경품 편집기 - 풍선터트리기</title>
+  <!-- Preconnect & Web Fonts for high-performance non-blocking load -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap">
+
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/admin.css">
+
+  <!-- Deferred non-blocking scripts -->
+  <script src="js/firebase-config.js" defer></script>
+  <script src="js/sync-helper.js" defer></script>
+  <script src="js/admin.js" defer></script>
+</head>
+<body>
+
+  <div class="admin-container">
+    <!-- Header Area -->
+    <header class="admin-header">
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <div>
+          <h1>⚙️ 게임 운영 설정</h1>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 5px;">풍선 뒤에 숨겨진 25개의 경품을 설정하고 게임판을 관리합니다.</p>
+        </div>
+        
+        <!-- Account Switcher Pill Selector for Admin -->
+        <div class="account-switcher glass-panel" style="padding: 8px 12px; border-radius: 12px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.02);">
+          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">운영 계정:</span>
+          <div style="display: flex; gap: 4px;" id="account-pills-container">
+            <button class="pill-btn" data-acc="1" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">1</button>
+            <button class="pill-btn" data-acc="2" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">2</button>
+            <button class="pill-btn" data-acc="3" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">3</button>
+            <button class="pill-btn" data-acc="4" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">4</button>
+            <button class="pill-btn" data-acc="5" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">5</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <a href="/" id="host-view-link" class="btn-secondary" style="text-decoration: none; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px;">
+          🖥️ 메인 풍선판 보기
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-layout">
+      
+      <!-- Left: Prize Cards Inputs -->
+      <section class="prize-edit-panel glass-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="font-size: 1.3rem; font-weight: 700;">🎈 풍선판 크기 및 경품 편집</h2>
+          <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">각 번호 칸에 들어갈 경품을 입력하세요.</span>
+        </div>
+        
+        <!-- Grid Size Toggle Selector -->
+        <div class="grid-size-selector-panel glass-panel" style="padding: 15px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; border: 1px dashed var(--glass-border); background: rgba(0, 242, 254, 0.02);">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: 0.9rem; font-weight: 700; color: white;">📐 풍선 칸 크기 선택 (Grid Size)</span>
+            <span style="font-size: 0.78rem; color: var(--text-secondary);">원하는 풍선판의 칸수를 선택해주세요. 즉시 동기화됩니다.</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="grid-size-5x5-btn" class="grid-size-btn active" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px; font-weight: 700;">5 × 5 (25칸)</button>
+            <button type="button" id="grid-size-6x6-btn" class="grid-size-btn" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px; font-weight: 700;">6 × 6 (36칸)</button>
+          </div>
+        </div>
+        
+        <form id="prize-form">
+          <div class="prize-grid" id="admin-prize-grid">
+            <!-- 25 input cells will be dynamically injected here -->
+          </div>
+        </form>
+
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;">
+            <input type="checkbox" id="toggle-all-winner-info" style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="toggle-all-winner-info" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+              🎯 당첨자 정보 입력 전체 선택 / 해제
+            </label>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">
+            각 풍선 아래 체크박스로 당첨자 정보 입력 필요 여부를 설정하고, 오른쪽 '저장 & 동기화' 버튼을 눌러 저장하세요.
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Control Center Sidebar -->
+      <aside class="toolkit-sidebar">
+        
+        <!-- Action Trigger Card -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">게임 동기화</h3>
+          <button id="save-prizes-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 1rem;">
+            💾 경품 및 설정 저장 & 동기화
+          </button>
+          <button id="copy-to-all-btn" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.88rem; margin-top: 8px; background: rgba(0, 242, 254, 0.08); border-color: rgba(0, 242, 254, 0.3); color: var(--accent-cyan); font-weight: 700;">
+            🌐 모든 계정(1~5)에 현재 경품 동일하게 적용
+          </button>
+          <div class="alert-box">
+            경품 저장 시 메인 풍선판 및 연결된 모바일에 <strong>실시간으로 동기화</strong>되며, 일괄 적용을 누르면 모든 계정에 현재 경품 구성이 동일하게 복사됩니다.
+          </div>
+        </div>
+
+        <!-- Account Names Settings Card -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">🏷️ 계정 이름 설정</h3>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-top: -5px;">
+            각 계정(1~5)의 표시 이름을 자유롭게 수정할 수 있습니다. (예: A 부스, 스타벅스존 등)
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.8rem; font-weight: 700; width: 50px; color: var(--accent-cyan);">계정 1:</span>
+              <input type="text" id="acc-name-input-1" class="prize-field" style="margin-top: 0; padding: 6px 10px;" placeholder="계정 1 이름">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.8rem; font-weight: 700; width: 50px; color: var(--accent-cyan);">계정 2:</span>
+              <input type="text" id="acc-name-input-2" class="prize-field" style="margin-top: 0; padding: 6px 10px;" placeholder="계정 2 이름">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.8rem; font-weight: 700; width: 50px; color: var(--accent-cyan);">계정 3:</span>
+              <input type="text" id="acc-name-input-3" class="prize-field" style="margin-top: 0; padding: 6px 10px;" placeholder="계정 3 이름">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.8rem; font-weight: 700; width: 50px; color: var(--accent-cyan);">계정 4:</span>
+              <input type="text" id="acc-name-input-4" class="prize-field" style="margin-top: 0; padding: 6px 10px;" placeholder="계정 4 이름">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.8rem; font-weight: 700; width: 50px; color: var(--accent-cyan);">계정 5:</span>
+              <input type="text" id="acc-name-input-5" class="prize-field" style="margin-top: 0; padding: 6px 10px;" placeholder="계정 5 이름">
+            </div>
+          </div>
+          <button id="save-account-names-btn" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem; margin-top: 6px;">
+            💾 계정 이름 저장 &amp; 반영
+          </button>
+        </div>
+
+        <!-- Quick Template Preset Card -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">경품 프리셋 템플릿</h3>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-top: -5px;">
+            자주 사용하는 경품 세트로 25개 칸을 한 번에 채울 수 있습니다. (저장 버튼을 눌러야 최종 적용됩니다)
+          </p>
+          <div class="preset-list">
+            <button class="preset-btn" id="preset-balanced">🎁 균형잡힌 이벤트 프리셋</button>
+            <button class="preset-btn" id="preset-generous">🔥 꽝 없는 푸짐한 프리셋</button>
+            <button class="preset-btn" id="preset-blank">💨 모두 꽝으로 비우기</button>
+          </div>
+        </div>
+
+        <!-- Board State Operations -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">풍선판 초기화 &amp; 비우기</h3>
+          
+          <button id="op-reset" class="btn-secondary" style="width: 100%; margin-bottom: 8px; justify-content: center; font-size: 0.85rem;">
+            🔄 풍선 리셋 (경품 위치 유지)
+          </button>
+          
+          <button id="op-shuffle" class="btn-secondary" style="width: 100%; margin-bottom: 8px; justify-content: center; font-size: 0.85rem; background: rgba(157, 78, 221, 0.05); border-color: rgba(157, 78, 221, 0.2); color: #c8a2c9;">
+            🔀 풍선 리셋 + 경품 셔플 (랜덤 섞기)
+          </button>
+
+          <button id="op-clear-all" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem; background: rgba(255, 23, 68, 0.08); border-color: rgba(255, 23, 68, 0.3); color: #ff5252; font-weight: 700;">
+            🗑️ 풍선판 내용 전체 삭제 (빈 칸 비우기)
+          </button>
+          
+          <div class="alert-box" style="background: rgba(255, 23, 68, 0.02); border-color: rgba(255, 23, 68, 0.1); margin-top: 8px; font-size: 0.8rem;">
+            ⚠️ <strong>풍선 리셋</strong>을 진행하면 터졌던 풍선들이 전부 재생성되며, <strong>전체 삭제</strong>를 누르면 모든 칸의 경품 및 설정이 완전히 초기화(삭제)됩니다.
+          </div>
+        </div>
+
+        <!-- Winners Management -->
+        <div class="toolkit-card glass-panel">
+          <h3 class="toolkit-title">🏆 당첨자 관리</h3>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-top: -5px;">
+            당첨자 정보를 확인하고 CSV로 다운로드할 수 있습니다.
+          </p>
+          
+          <!-- Date Filter Inputs -->
+          <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="winner-start-date" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">시작일:</label>
+              <input type="date" id="winner-start-date" class="prize-field" onclick="this.showPicker()" style="padding: 6px 10px; font-size: 0.8rem; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: var(--text-primary); font-family: inherit; cursor: pointer;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="winner-end-date" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">종료일:</label>
+              <input type="date" id="winner-end-date" class="prize-field" onclick="this.showPicker()" style="padding: 6px 10px; font-size: 0.8rem; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: var(--text-primary); font-family: inherit; cursor: pointer;">
+            </div>
+          </div>
+
+          <button id="download-csv-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; margin-top: 12px;">
+            📥 CSV 다운로드
+          </button>
+          <button id="clear-winners-btn" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem; margin-top: 8px; background: rgba(255, 23, 68, 0.06); border-color: rgba(255, 23, 68, 0.25); color: #ff5252;">
+            🗑️ 당첨자 기록 초기화
+          </button>
+          <div id="winners-count" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; text-align: center;">
+            당첨자: 0명
+          </div>
+        </div>
+
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- Fullscreen Account Selector Overlay (Visible initially if no account selected) -->
+  <div class="modal-overlay active" id="account-select-overlay" style="display: none;">
+    <div class="glass-panel" style="width: 550px; max-width: 90%; padding: 40px 30px; text-align: center; display: flex; flex-direction: column; gap: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border-radius: 20px;">
+      <div>
+        <h2 style="font-size: 2.2rem; font-weight: 800; background: linear-gradient(45deg, #00f2fe, #9d4edd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px;">⚙️ 운영자 계정 선택</h2>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5;">관리하고 편집할 게임판 계정을 선택해주세요.<br>선택한 계정의 풍선 상태와 경품이 동기화됩니다.</p>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px;">
+        <button class="account-card-btn" data-account="1">
+          <span class="card-icon">01</span>
+          <span class="card-title">계정 1</span>
+          <span class="card-desc">연동 게임판 1</span>
+        </button>
+        <button class="account-card-btn" data-account="2">
+          <span class="card-icon">02</span>
+          <span class="card-title">계정 2</span>
+          <span class="card-desc">연동 게임판 2</span>
+        </button>
+        <button class="account-card-btn" data-account="3">
+          <span class="card-icon">03</span>
+          <span class="card-title">계정 3</span>
+          <span class="card-desc">연동 게임판 3</span>
+        </button>
+        <button class="account-card-btn" data-account="4">
+          <span class="card-icon">04</span>
+          <span class="card-title">계정 4</span>
+          <span class="card-desc">연동 게임판 4</span>
+        </button>
+        <button class="account-card-btn" data-account="5">
+          <span class="card-icon">05</span>
+          <span class="card-title">계정 5</span>
+          <span class="card-desc">연동 게임판 5</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
