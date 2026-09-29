@@ -177,7 +177,7 @@ let currentAimGridSize = 0;
 function rebuildAimGrid(size) {
   if (!aimGrid) return;
   aimGrid.innerHTML = '';
-  const gridSize = Math.sqrt(size) || 5;
+  const gridSize = (size >= 36) ? 6 : 5;
   aimGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
   aimGrid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
   
@@ -193,7 +193,7 @@ let mobilePoppedState = Array(25).fill(false);
 
 function updateAimVisualizer() {
   const size = mobilePoppedState.length;
-  const gridSize = Math.sqrt(size) || 5;
+  const gridSize = (size >= 36) ? 6 : 5;
   
   if (currentAimGridSize !== size) {
     currentAimGridSize = size;

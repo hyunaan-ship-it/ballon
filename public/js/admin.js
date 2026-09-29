@@ -22,11 +22,49 @@ const presetBalancedBtn = document.getElementById('preset-balanced');
 const presetGenerousBtn = document.getElementById('preset-generous');
 const presetBlankBtn = document.getElementById('preset-blank');
 
-// Build 25 modular input cards
+function sanitizeData(prizes, popped, reqWinnerInfo) {
+  let cleanPrizes = Array.isArray(prizes) ? [...prizes] : [];
+  let grid = (cleanPrizes.length >= 36) ? 6 : 5;
+  let targetLen = grid * grid;
+
+  const defaultFillers = [
+    "스타벅스 커피", "문화상품권 1만원", "꽝 (아쉬워요!)", "치킨 쿠폰", "베스킨라빈스 싱글", "신세계 상품권 3만원"
+  ];
+  if (cleanPrizes.length < targetLen) {
+    while (cleanPrizes.length < targetLen) {
+      cleanPrizes.push(defaultFillers[cleanPrizes.length % defaultFillers.length]);
+    }
+  } else if (cleanPrizes.length > targetLen) {
+    cleanPrizes = cleanPrizes.slice(0, targetLen);
+  }
+
+  let cleanPopped = Array.isArray(popped) ? [...popped] : [];
+  if (cleanPopped.length < targetLen) {
+    while (cleanPopped.length < targetLen) cleanPopped.push(false);
+  } else if (cleanPopped.length > targetLen) {
+    cleanPopped = cleanPopped.slice(0, targetLen);
+  }
+
+  let cleanReq = Array.isArray(reqWinnerInfo) ? [...reqWinnerInfo] : [];
+  if (cleanReq.length < targetLen) {
+    while (cleanReq.length < targetLen) cleanReq.push(false);
+  } else if (cleanReq.length > targetLen) {
+    cleanReq = cleanReq.slice(0, targetLen);
+  }
+
+  return { prizes: cleanPrizes, popped: cleanPopped, requireWinnerInfo: cleanReq, gridSize: grid };
+}
+
+// Build modular input cards
 function buildGridStructure() {
   adminPrizeGrid.innerHTML = '';
-  const size = currentPrizes.length || 25;
-  const gridSize = Math.sqrt(size) || 5;
+  const sanitized = sanitizeData(currentPrizes, currentPopped, currentRequireWinnerInfo);
+  currentPrizes = sanitized.prizes;
+  currentPopped = sanitized.popped;
+  currentRequireWinnerInfo = sanitized.requireWinnerInfo;
+
+  const size = currentPrizes.length;
+  const gridSize = sanitized.gridSize;
   adminPrizeGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
   
   for (let i = 0; i < size; i++) {
@@ -247,7 +285,7 @@ function syncUIWithData() {
 
 function updateSectionTitle() {
   const size = currentPrizes.length || 25;
-  const gridSize = Math.sqrt(size) || 5;
+  const gridSize = (size >= 36) ? 6 : 5;
   const titleEl = document.querySelector('.prize-edit-panel h2');
   if (titleEl) {
     titleEl.innerText = `🎈 ${gridSize} x ${gridSize} 풍선별 경품 편집`;

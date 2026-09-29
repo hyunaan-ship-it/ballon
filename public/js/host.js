@@ -527,7 +527,7 @@ function updateAccountNamesUI(names) {
       serverPopped = data.popped;
       
       const size = serverPrizes.length;
-      const gridSize = Math.sqrt(size) || 5;
+      const gridSize = data.gridSize || (size >= 36 ? 6 : 5);
       gridEl.className = `board-grid grid-${gridSize}x${gridSize}`;
       
       renderBoard();
