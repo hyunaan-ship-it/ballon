@@ -1370,22 +1370,39 @@ class BalloonSyncHelper {
     } else if (this.mode === 'supabase' && this.db) {
       // Broadcast state-updated and board-reset across ALL 5 account channels
       for (let id = 1; id <= 5; id++) {
-        const channelName = `balloon-sync-room-${this.room}-acc-${id}`;
-        const targetChannel = (String(id) === String(this.accountId) && this.channel) 
-          ? this.channel 
-          : this.db.channel(channelName);
-        
-        targetChannel.send({
-          type: 'broadcast',
-          event: 'state-updated',
-          payload: currentState
-        }).catch(() => {});
+        if (String(id) === String(this.accountId) && this.channel) {
+          this.channel.send({
+            type: 'broadcast',
+            event: 'state-updated',
+            payload: currentState
+          }).catch(() => {});
 
-        targetChannel.send({
-          type: 'broadcast',
-          event: 'board-reset',
-          payload: {}
-        }).catch(() => {});
+          this.channel.send({
+            type: 'broadcast',
+            event: 'board-reset',
+            payload: {}
+          }).catch(() => {});
+        } else {
+          const channelName = `balloon-sync-room-${this.room}-acc-${id}`;
+          const tempCh = this.db.channel(channelName);
+          tempCh.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              tempCh.send({
+                type: 'broadcast',
+                event: 'state-updated',
+                payload: currentState
+              }).catch(() => {});
+              tempCh.send({
+                type: 'broadcast',
+                event: 'board-reset',
+                payload: {}
+              }).catch(() => {});
+              setTimeout(() => {
+                try { this.db.removeChannel(tempCh); } catch(e){}
+              }, 3000);
+            }
+          });
+        }
       }
     } else if (this.mode === 'firebase' && this.db) {
       for (let id = 1; id <= 5; id++) {
