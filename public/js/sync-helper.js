@@ -1367,17 +1367,26 @@ class BalloonSyncHelper {
         requireWinnerInfo: requireWinnerInfo,
         gridSize: sizeVal
       });
-    } else if (this.mode === 'supabase' && this.channel) {
-      this.channel.send({
-        type: 'broadcast',
-        event: 'state-updated',
-        payload: currentState
-      });
-      this.channel.send({
-        type: 'broadcast',
-        event: 'board-reset',
-        payload: {}
-      });
+    } else if (this.mode === 'supabase' && this.db) {
+      // Broadcast state-updated and board-reset across ALL 5 account channels
+      for (let id = 1; id <= 5; id++) {
+        const channelName = `balloon-sync-room-${this.room}-acc-${id}`;
+        const targetChannel = (String(id) === String(this.accountId) && this.channel) 
+          ? this.channel 
+          : this.db.channel(channelName);
+        
+        targetChannel.send({
+          type: 'broadcast',
+          event: 'state-updated',
+          payload: currentState
+        }).catch(() => {});
+
+        targetChannel.send({
+          type: 'broadcast',
+          event: 'board-reset',
+          payload: {}
+        }).catch(() => {});
+      }
     } else if (this.mode === 'firebase' && this.db) {
       for (let id = 1; id <= 5; id++) {
         const stateRef = this.db.ref(`/rooms/${this.room}/accounts/${id}/state`);

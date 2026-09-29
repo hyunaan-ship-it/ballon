@@ -409,14 +409,15 @@ saveBtn.addEventListener('click', (e) => {
   alert("🎉 경품 및 설정이 성공적으로 저장 및 live 동기화되었습니다!");
 });
 
-// Copy prizes configuration to all accounts (1-4)
+// Copy prizes configuration to all accounts (1-5)
 const copyToAllBtn = document.getElementById('copy-to-all-btn');
 if (copyToAllBtn) {
   copyToAllBtn.addEventListener('click', (e) => {
     e.preventDefault();
     const updatedPrizes = [];
     let hasEmpty = false;
-    const size = currentPrizes.length;
+    const cells = document.querySelectorAll('.prize-input-cell');
+    const size = (cells && cells.length) ? cells.length : (currentPrizes.length || 25);
     
     for (let i = 0; i < size; i++) {
       const input = document.getElementById(`prize-input-${i}`);
@@ -444,7 +445,6 @@ if (copyToAllBtn) {
     const accName = (SyncHelper.accountNames && SyncHelper.accountNames[accountId]) || `계정 ${accountId}`;
     if (confirm(`현재 계정(${accName})의 경품 내용 및 설정을 계정 1, 2, 3, 4, 5 전체에 동일하게 적용(복사)하시겠습니까?\n\n이 작업은 모든 계정의 경품 배치를 현재 계정과 동일하게 변경하고 풍선판을 초기화합니다.`)) {
       SyncHelper.copyPrizesToAllAccounts(updatedPrizes, requireWinnerInfo, Math.sqrt(size) || 5);
-      SyncHelper.updatePrizesAndSettings(updatedPrizes, requireWinnerInfo);
       alert("🎉 모든 계정(1~5)에 현재 경품 설정이 동일하게 성공적으로 적용되었습니다!");
     }
   });
