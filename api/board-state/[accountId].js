@@ -77,33 +77,49 @@ export default async function handler(req, res) {
     const computedGridSize = gridSize || Math.sqrt(fallbackSize) || 5;
 
     try {
+      const bodyPayload = {
+        prizes,
+        popped,
+        require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
+        grid_size: computedGridSize,
+        updated_at: new Date().toISOString()
+      };
+
       // Check if record exists for this account_id
       const existing = await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(accountId)}`);
       if (existing && existing.length > 0) {
         // Record exists, update via PATCH
-        await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(accountId)}`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            prizes,
-            popped,
-            require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
-            grid_size: computedGridSize,
-            updated_at: new Date().toISOString()
-          })
-        });
+        try {
+          await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(accountId)}`, {
+            method: 'PATCH',
+            body: JSON.stringify(bodyPayload)
+          });
+        } catch (err) {
+          if (err.message.includes('grid_size') || err.message.includes('PGRST204')) {
+            delete bodyPayload.grid_size;
+            await supabaseFetch(`/board_state?account_id=eq.${encodeURIComponent(accountId)}`, {
+              method: 'PATCH',
+              body: JSON.stringify(bodyPayload)
+            });
+          } else throw err;
+        }
       } else {
         // Record does not exist, insert via POST
-        await supabaseFetch('/board_state', {
-          method: 'POST',
-          body: JSON.stringify({
-            account_id: String(accountId),
-            prizes,
-            popped,
-            require_winner_info: requireWinnerInfo || Array(fallbackSize).fill(false),
-            grid_size: computedGridSize,
-            updated_at: new Date().toISOString()
-          })
-        });
+        const insertPayload = { account_id: String(accountId), ...bodyPayload };
+        try {
+          await supabaseFetch('/board_state', {
+            method: 'POST',
+            body: JSON.stringify(insertPayload)
+          });
+        } catch (err) {
+          if (err.message.includes('grid_size') || err.message.includes('PGRST204')) {
+            delete insertPayload.grid_size;
+            await supabaseFetch('/board_state', {
+              method: 'POST',
+              body: JSON.stringify(insertPayload)
+            });
+          } else throw err;
+        }
       }
       return res.status(200).json({ status: 'success' });
     } catch (err) {
